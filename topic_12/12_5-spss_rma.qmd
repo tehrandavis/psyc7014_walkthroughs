@@ -1,0 +1,9 @@
+---
+title: "Running a RM-ANOVA in SPSS"
+---
+
+## How to perform a within subjects analysis in SPSS:
+
+I'll likely put together my own vid, but it won't be much better than this:
+
+{{< video https://www.youtube.com/embed/9TDvejlOP0Q >}}

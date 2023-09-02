@@ -1,0 +1,184 @@
+---
+title: "Measures of central tendency"
+---
+
+You've covered a lot of ground this week reading about measures of central tendency and introducing yourselves to distributions. With this walkthrough I want to apply a few of the things from your readings and our discussion. 
+
+Before jumping in, let's install and load the necessary packages in R. This week we will make use of `psych`, and several of the core packages of the `tidyverse`.
+
+Using the [cheat code](#cheat_code) from last week's **Level-up**:
+
+```{r}
+# 1. check to see if pacman is on your computer and if not, let's install it:
+if (!require("pacman")) install.packages("pacman",repos="http://cran.us.r-project.org")
+
+# 2. install all other packages that we will be using:
+pacman::p_load(psych, tidyverse)
+```
+
+Throughout this walk through (and many through the semester) we'll use data from datasets that I've found on the web or created. Here we will be using a dataset referred to in David Flora's textbook *Statistical Methods for the Social and Behavioural Sciences: A Model Based Approach* (one of you recommended texts). You'll be asked to read an except from that text for the next module.
+
+This data is related to the question of whether certain personality characteristics are predictors of aggression. Let's start by reading this data into `R`.
+
+```{r}
+library(readr)
+aggression_data <- read_table("https://tehrandav.is/courses/statistics/practice_datasets/aggression.dat", col_names = FALSE)
+```
+
+Invoking `class(aggression_data)` tells us that `aggression_data` is a data frame (or table). Invoking `names(aggression_data)` provides us with the header names. In this case `aggression_data` has no header names.
+
+```{r class and names}
+class(aggression_data)
+names(aggression_data)
+```
+
+For the sake of you're own sanity, you should always provide headers for your data frame if it does not come with them. Building on last week's homework, we can fix this by invoking the following to add the appropriate headers
+
+```{r}
+names(aggression_data) <- c('age', 'BPAQ', 'AISS', 'alcohol', 'BIS', 'NEOc', 'gender', 'NEOo')
+```
+
+And now checking the modified data frame:
+
+```{r}
+aggression_data
+```
+
+Building from last week's homework assignment, we can call individual columns within the data frame using the `$` operator:
+
+```{r pulling columns}
+# column of subject age(s):
+aggression_data$age
+
+# column of BPAQ score: https://www.psytoolkit.org/survey-library/aggression-buss-perry.html
+aggression_data$gender
+
+# column of reported gender
+aggression_data$gender
+```
+
+## Getting measures of central tendency
+
+We can use simple functions to get the mean, median, and standard deviation of an individual column of data. Remember for your reading that these measures make the most sense when the measure in question is numeric (continuous / ratio scale). For example here let's take a look at **BPAQ** (https://www.psytoolkit.org/survey-library/aggression-buss-perry.html):
+
+```{r}
+mean(aggression_data$BPAQ) #mean
+median(aggression_data$BPAQ) #median
+sd(aggression_data$BPAQ) #std. dev.
+```
+
+Most of the data that we deal with comes in the form of data frames like `aggression_data`. It might be cumbersome to get the `mean`, `median` and `sd` for each column separately. Instead, we can use `psych::describe()` to generate summary stats of all data in a data frame:
+
+```{r}
+psych::describe(aggression_data)
+```
+
+This provides info related to the:
+
+1.  item name
+2.  item number
+3.  number of valid cases (identifies if data is missing)
+4.  mean
+5.  standard deviation
+6.  trimmed mean (with trim defaulting to .1)
+7.  median (standard or interpolated)
+8.  mad: median absolute deviation (see Leys et al, 2013)
+9.  minimum value
+10. maximum value
+11. skew
+12. kurtosis
+13. standard error
+
+## Turning numeric data into categorical
+
+Looking at out output from above, one thing to keep in mind is that some of measures printed by `psych::describe()` may not make sense for specific columns of data. For example, the output table above has a mean value for `gender` (0.79). This is because in this data set men are designated the value 0 and women are designated 1. By default, when `R` encounters only numbers a column it treats them as `numeric`. However, in this case, the values in `gender` are better understood as *nominal* (ignoring discussions about gender fluidity that really wouldn't fit into this simplistic classification to begin with). How might we deal with this?
+
+We need to tell `R` that these data are categories, or *factors* and not continuous numbers. To do so we can call on the `factor()` function as below.
+
+```{r}
+# convert a numeric to a categorical (i.e., make a factor)
+factor(aggression_data$gender)
+```
+
+When you run the line above you'll note at the end of the output it mentions `Levels: 0 1`. This is telling you that in this vector, there are two levels, `gender = 0` and `gender = 1`. To connect this factorized vector to your original data set, you can either create a new column in the data set or overwrite the original `gender` column that you are replacing. For beginners, I would recommend adding a new column. To do this, let's take advantage of some of those fancy `tidyverse` / `dplyr` skills you picked up from DataCamp in particular `mutate()`
+
+```{r}
+# 1. create a new vector attached to the original data frame
+#    using the dplyr::mutate function:
+
+aggression_data <-
+    aggression_data %>% # take the original aggression_data data frame, and then...
+    mutate(aggression_data, fctr_Gender = factor(gender)) # add a column named fctr_Gender
+aggression_data
+```
+
+Your new column is appended to the end of the `aggression_data` data frame. now when we run:
+
+```{r}
+psych::describe(aggression_data) 
+```
+
+We see our new variable `fctr_Gender`. The \* next to it indicates that it is a categorical variable. `R` is now warning us to proceed with caution when interpreting the descriptive stats related to fctr_Gender. But you'll notice that it still gives us these measures. The lesson here is to be careful when interpreting this data.
+
+Ultimately, it makes the most sense to change the numeric levels in `gender` to `man` and `woman` respectively. This can be accomplished using the `dplyr::recode_factor()`. The structure of this function is:
+
+```{r template recode, eval=FALSE}
+dplyr::recode_factor(data_frame$column_name, "old_level_1" = "new_level_1", ...)
+```
+
+So we wanted to recode our original `gender` column, we can:
+
+```{r}
+dplyr::recode_factor(aggression_data$gender, "0" = "Man", "1" = "Woman")
+```
+
+Remember that the code above is not assigning the output to any variable, so it will not be saved. This can be accomplished in one fell swoop by including recode_factor() in the `mutate()` function:
+
+```{r}
+aggression_data <- # save to "aggression_data" 
+    # take the original aggression_data data frame, and then...
+    aggression_data %>%
+    # create a new column named fctr_Gender that recodes the original
+    # gender column to Man and Woman
+    mutate(fctr_Gender = recode_factor(gender, "0" = "Man", "1" = "Woman"))
+    
+print(aggression_data)
+```
+
+
+Now if we compare our original `gender` column:
+
+```{r}
+mean(aggression_data$gender)
+```
+
+to our re-coded `fctr_Gender` column:
+
+```{r}
+mean(aggression_data$fctr_Gender)
+```
+
+you'll see that the levels have been transformed *AND* trying to get the mean of a categorical value gives us an error (as it should!)
+
+Before moving on, I want to stress that we can assign our summary table to an object:
+
+```{r}
+aggression_data_summary <- psych::describe(aggression_data)
+
+```
+
+and now anytime we call `aggression_data_summary` we get this table
+
+```{r}
+aggression_data_summary
+```
+
+## Getting summary stats by groups or conditions
+
+You may also get summary statistics subsetted for individual `group`s. In this case the `fctr_Gender` column that we just created above has two groups, men and women. To take a look at the summary stat by Gender, or `fctr_Gender` we use the `psych::describeBy()` function, and designate the group that we want to split by:
+
+```{r}
+psych::describeBy(aggression_data,group = aggression_data$fctr_Gender)
+```
+
+Check out this video briefly describing one of the quirks of the `psych::describe()` output: <https://youtu.be/ZFHTTY9886k>

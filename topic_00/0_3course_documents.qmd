@@ -1,0 +1,99 @@
+---
+title: "Installing and loading an `R` package"
+---
+
+This week we aim to supplement the assigned readings and homework with a few blurbs and examples in `R`. We will learn how to install packages and load data into the `RStudio` environment, and will discuss how to build your own functions in `R`.
+
+Two of the first skills that you are going to need to learn are 1) how to install / load your required packages into the `R` environment and 2) how to import data from a file. More often than not, these will be the first two steps of your analysis (though if you are working on more complex projects you may find it easier to keep track of things if you load import your data and packages as needed).
+
+Note that much, but not all of what we discuss here is covered in two videos available to you on the [GradStats Youtube Channel](https://youtube.com/playlist?list=PLLv6V3KCs8wMoc5i2YT1YCmZudgne7Xzj).
+
+# Loading packages
+
+One of the great things about `R` is its extensibility via packages. For other great things about `R` (or how to sell `R` to your peers) see [this link](https://simplystatistics.org/2017/10/30/how-do-you-convince-others-to-use-r/) on [simplystatistics.org](https://simplystatistics.org). In fact this blog is a great resource for staying in contact with topics and new developments in data analysis.
+
+From Peng's article:
+
+> "With over 10,000 packages on CRAN alone, [there’s pretty much a package to do anything](https://youtu.be/yhTerzNFLbo). More importantly, the people contributing those packages and the greater `R` community have expanded tremendously over time, bringing in new users and pushing `R` to be useful in more applications. Every year now there are probably hundreds if not thousands of meetups, conferences, seminars, and workshops all around the world, all related to R."
+
+For example, in my own work I often find myself not only using statistical techniques such as growth curve modeling (package: `lmer`) but also advanced quantification techniques such as cross recurrence quantificantion analysis (package: `crqa`), MultiFractal Detrended Fluctuation Analysis (package: `MFDFA`), and Sample Entropy (package: `TSEntropies`). When I was a grad student, performing any of these analyses required me to put together 100's of lines of custom coding to... today, there's an `R` package for that—i.e., someone else likely with far greater programming abilities than I has already done it.
+
+
+## Installing a package using the GUI
+
+For the point-and-click crowd, the easiest way to install an `R` package is to locate the `Packages` tab in your Window. From here, you can click install. From there you can type in the package that you wish to install. So for example, let's install the `psych` package, which is useful for obtaining descriptive stats from your data (although to be honest I hardly use it). Check out an example from [this video](get youtube link).
+
+As you can see the video, I left the `Install dependences` box ticked. *You should always install with dependencies*, this automatically installs other packages that may be required for `psych` (or whatever package of interest) to work. You may have also noticed when after you clicked OK, `R` entered this line of code into your `Console`.
+
+```{r}
+#| eval: false
+
+install.packages("psych")
+```
+
+
+Which leads us to...
+
+## Installing packages with `install.packages()`
+
+A basic install of `R` comes with the `base` package which has an unbelievably large number of functions and analyses built in. However learning `base` `R` has a somewhat steep learning curve, especially for those with no programming experience. In this course we will use many of the simple functions in `base` R, but for more complex data wrangling (sorting, structuring our data), statistical analysis, and plotting we will use the wonderful `tidyverse` package. `tidyverse` piggybacks on the basic install, replacing the sometimes bewildering `R` syntax with more natural language. Here, we'll use `tidyverse` as an example of how to install from command line.
+
+Installing `tidyverse` (or any package for that manner) couldn't be easier. At the prompt (or in your notebook) simply type:
+
+```{r}
+#| eval: false
+install.packages("tidyverse")
+```
+
+Congratulations, you have installed over 70 new packages to your `R` environment!
+
+You see, `tidyverse` is not a single package (as is usually the case), but a collection of packages that function seamlessless with one another abiding a shared ethos of data science practices (who knew there were ethos in stats! A simple google search of `tidyverse` might lead you to believe that you have joined a cult with Hadley Wickham as your leader!). The core value is that data should be structured, analyzed, presented, and shared in a manner that is as transparent as possible. In this class, we aren't going to go the "full Hadley" (all the way down the rabbit hole) but we are going to abide many shared principles (it's just good science!).
+
+
+Note for the `crqa` package I simply type `install.packages("crqa")` and for `MFDFA` `install.packages("MFDFA")`. You noticing a pattern here?
+
+## An IMPORTANT note on Rendering with install.packages:
+
+One quirk with knitting from your source is that you will need to specify which CRAN mirror you will download the package from. The Comprehensive `R` Network (CRAN) is an online repository that houses almost all things R, including packages. There are multiple mirrors set up all over the globe (https://cran.r-project.org/mirrors.html) and you need to tell `R` which one is your preferred choice. The quirk is that you only need to do this when knitting/compiling. You don't need to do this for other everday use, but your source will often not compile unless you correct this. See [here](https://stackoverflow.com/questions/33969024/install-packages-fails-in-knitr-document-trying-to-use-cran-without-setting-a) to read more about the error this produces.
+
+Since your homework is going to involve rendering you should probably get in the practice of fixing this. There are two ways to resolve this issue. The first is to simply add the `repos` argument to your `install.packages()` command like so:
+
+``install.packages("package name", repos="http://cran.us.r-project.org")``
+
+Executing this once (adding the repo) usually fixes things for the rest of your session. If you find you keep encountering this issue, there is a brute-force alternative that involves you providing a default repo at the outset. This can be accomplished by creating a new chunk at the beginning of your Quarto file (right underneath your header), and inserting the following:
+
+```{r}
+#| eval: false
+
+setRepositories(graphics = getOption("menu.graphics"),  
+ind = NULL, addURLs = character())
+r <- getOption("repos")
+r["CRAN"] <- "http://cran.cnr.berkeley.edu/"
+options(repos = r)
+```
+
+
+
+
+## Loading packages with `library()`
+
+Once you have installed a package, it remains stored on your hard-drive until you delete it (which you'll amost never do, packages take up so little disk space it's really not efficient to install and uninstall unless absolutely necessary). A common point of confusion for many new users is that just because a package is _installed_ does not mean that it is _loaded_. To load a package we typically use the `library()` command. For example to load `tidyverse`, we can type:
+
+```{r}
+library(tidyverse)
+```
+
+That's it, easy-peasy. Note that by default, only the `base` packages are typically loaded when you start a new session. Therefore, *a useful practice to get into is to load the necessary packages at the start of every session.*
+
+Before moving on, I'd like to point out two things. First, notice that when installing with `install.packages()` we included quotations around the package name, but with `library()` we did not. Knowing when to use quotation marks and when not to is one of the more frustrating things to grasp for beginners (and even is an annoyance for me from time to time). All I can say is with practice, it becomes automatic. In truth, in the case of `library()` whether you include the quotes or not doesn't matter (the default is to not), but for many functions, including `install.packages()`, the proper quotes do matter (for example: `install.packages(tidyverse)` will result in an error). 
+
+Second, while installing `tidyverse` installs over 70 packages on your computer, `library(tidyverse)` only loads 8 or so primary packages. This isn't really much of an issue as we will be mostly using this common `tidyverse` packages, but it's worth mentioning for future reference. Finally, when you loaded `tidyverse`, it likely gave you a message about *Conflicts*. Conflict arise when different packages use the same names for functions. For example, the message:
+
+```dplyr::filter() masks stats::filter()``
+
+is telling you that both `stats` and `dplyr` have a function called `filter()` and that `dplyr` is the default. This means that if you execute `filter()` by itself it will default to the `dplyr` version. If you ever find yourself in a situation were a function you know should be working isn't, first check to be sure `R` is indeed calling from the correct package. That said this can be avoided by getting in the habit of using the `package::function()` convention. I will typically use this format with few exceptions (out of habit): `ggplot` and `pre-installed` functions.
+
+
+
+
+

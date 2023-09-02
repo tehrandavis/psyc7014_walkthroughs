@@ -1,0 +1,49 @@
+---
+title: "Getting started"
+---
+
+Note: As of Fall 2023, we will be using the following versions of the software:
+
+- R version 4.3.1
+- RStudio: 2023.06.2+561
+
+**I would recommend having at least these versions installed on your computer.**
+
+## Step 1: Download R
+
+To begin your journey into the world of statistics using R, you first need to download the latest version of R. Visit the Comprehensive R Archive Network (CRAN) website at [https://cran.r-project.org/](https://cran.r-project.org/). This is the official repository for R, containing the latest releases and updates.
+
+
+Select the appropriate version for your operating system (Windows, macOS, or Linux). Follow the download link and instructions provided for your specific platform:
+
+-   For **Windows** users, click on "Download R for Windows" and then click on "base." Finally, click on "Download R x.x.x for Windows" (where x.x.x represents the latest version number).
+-   For **macOS** users, click on "Download R for (Mac) OS X" and then select the appropriate package based on your macOS version and hardware (Intel or Apple Silicon).
+-   For **Linux** users, click on "Download R for Linux," choose your distribution, and follow the instructions provided.
+
+## Step 2: Install R
+
+Once the R installer has been downloaded, locate the installation file in your downloads folder and double-click it to start the installation process. Follow the on-screen instructions, accepting the default settings, to complete the installation.
+
+## Step 3: Download RStudio
+
+RStudio is a powerful integrated development environment (IDE) that simplifies working with R. It provides a user-friendly interface, code editor, and various tools for managing your R projects. Visit the RStudio website at [https://www.rstudio.com/products/rstudio/download/](https://www.rstudio.com/products/rstudio/download/) to download the latest version of RStudio.
+
+Scroll down to the "Installers for Supported Platforms" section and choose the appropriate installer for your operating system.
+
+## Step 4: Install RStudio
+
+After downloading the RStudio installer, locate the installation file in your downloads folder and double-click it to start the installation process. Follow the on-screen instructions, accepting the default settings, to complete the installation.
+
+## Step 5: Launch RStudio
+
+Once both R and RStudio have been installed, open RStudio from your applications or programs menu. You should see a window similar to the one below, with a console on the left and various panels on the right. 
+
+![RStudio screenshot](https://rstudioblog.files.wordpress.com/2011/02/rstudio-windows500.png)
+
+In the **Console** pane, try typing a simple command at the prompt `>` to make sure R is working correctly. For example, type **`2+2`** and press enter. If R is working correctly, it should display **`4`**.
+
+```{r}
+2 + 2
+```
+
+Congratulations! You have successfully installed R and RStudio, and you are now ready to begin exploring the world of statistics using these powerful tools. In our upcoming lessons, we will dive deeper into using R for data analysis, visualization, and statistical modeling.

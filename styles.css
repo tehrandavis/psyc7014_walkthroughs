@@ -1,0 +1,26 @@
+/* css styles */
+pre sourceCode {
+    font-size: 13px; /* Adjust the value to your preferred font size */
+    white-space: pre-wrap;
+
+  }
+
+/* Change the font size of the sidebar */
+.bd-sidebar {
+    font-size: 3 px; /* Adjust the value to your preferred font size */
+  }
+
+.cover-image-container {
+  text-align: center; /* Adjust alignment as needed */
+  padding: 40px; /* Adjust padding value as needed */
+}
+
+.cover-image-container img {
+  max-width: 100%; /* Adjust image size as needed */
+  height: auto;
+}
+
+.cell {
+  font-size: 12px; /* Adjust the value to your preferred font size */
+  white-space: pre-wrap;
+}

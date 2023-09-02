@@ -1,0 +1,51 @@
+project:
+  type: book
+  output-dir: _book
+
+  resources: 
+    - "images/"
+    - "practice_datasets/"
+    - "custom_functions/"
+  
+book:
+  title: "PSYC 7014: Graduate Statistics 1"
+  reader-mode: true
+
+  page-footer: 
+    left: |
+      Written by <a href="https://tehrandav.is">Tehran Davis</a> of PSYC 7014.
+    right: |
+      This book was built with <a href="https://quarto.org/">Quarto</a>.
+
+  site-url: https://tehrandav.is/
+  chapters:
+    - index.qmd
+
+    - part: "Part 1: INTRO to R"
+      chapters:
+        - topic_00/0_1-getting_started.qmd
+        - topic_00/0_2-resources.qmd
+        - topic_01/1_1-Rmarkdown_basics.qmd
+        - topic_01/1_2-objects_assignment_functions.qmd
+        - topic_01/1_3-install_packages.qmd
+        - topic_01/1_4-loading_data.qmd
+        - topic_01/1_5-leveling-up.qmd
+    - part: "Part 2: DESCRIBING DATA"
+      chapters:
+        - topic_02/2_1-structure_data.qmd
+        - topic_02/2_2-central_tendency.qmd
+        - topic_02/2_4-means_other_models.qmd
+
+    
+    
+
+    
+
+format:
+  bookup-html:
+    toc: true
+    toc-depth: 3
+    css: styles.css
+    style: "docked"
+
+ 

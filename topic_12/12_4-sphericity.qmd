@@ -1,0 +1,242 @@
+---
+title: "Sphericity: Variances and Co-Variances"
+output: html_notebook
+---
+
+In this walkthrough I'm just going to be building a few intuitions about what we mean by sphericity and how it relates to our homogeneity of variance assumptions.
+
+# Between Subjects Example
+
+For this example, let's assume that we have three **groups** of participants that we are comparing against one another. Let's generate the data for these groups---A, B, & C.Each group has the same number of members and same variances (sds), but different means:
+
+```{r}
+pacman::p_load(tidyverse)
+
+set.seed(1)
+A <- rnorm(n = 50, mean = 60, sd = 7)
+B <- rnorm(n = 50, mean = 65, sd = 7)
+C <- rnorm(n = 50, mean = 70, sd = 7)
+```
+
+## The correlation matrix
+
+### Auto-correlation
+
+Auto correlation simply means the correlation of data with itself. In practical circumstances there is an additional wrinkle to auto-correlation like introducing a "lag" in the data, but for our purposes we are just going to correlate the original data from each group against itself. This will always result in a correlation of 1:
+
+```{r}
+aa <- cor(A,A)
+bb <- cor(B,B)
+cc <- cor(C,C)
+
+c("correlation A" = aa,
+  "correlation B" = bb,
+  "correlation C" = cc)
+```
+
+### across groups correlations
+
+Now we need to test for the correlations of each group to the other groups. Notice that when we generated our data in Chunk 1, each group was **randomly** generated, **independent** of one another. This captures these two critical assumptions of Between Subjects ANOVA. This also means that there should be no correlations (inter-dependencies) between our groups. While theoretically this means that any between group correlations should equal zero, in practice we should get a very low number. (Keep in mind your values may be different from mine due to random generation, unless you set the seed as I did to 1):
+
+```{r}
+ab <- cor(A,B)
+ac <- cor(A,C)
+bc <- cor(B,C)
+
+c("correlation AB" = ab, "correlation AC" = ac, "correlation BC" = bc)
+```
+
+From here, we can build our correlation matrix by first assigning the mirrors to our correlations above (e.g., the correlation of A to C is the same as C to A).
+
+```{r}
+ba <- ab # mirrors
+ca <- ac
+cb <- bc
+```
+
+And building the matrix
+
+```{r}
+correlation_matrix <- matrix(c(aa, ab, ac,
+                               ba, bb, bc,
+                               ca, cb, cc),
+                             ncol = 3)
+rownames(correlation_matrix) = c("A", "B", "C")
+colnames(correlation_matrix) = c("A", "B", "C")
+
+correlation_matrix %>% round(3)
+```
+
+## The covariance matrix
+
+We can translate the correlation matrix to a covariance matrix by cross multiplying by our group standard deviations. (Or, since we had the original data, I suppose we could have just taken the `cov()` of each column)
+
+```{r}
+stdevs <- c(sd(A), sd(B), sd(C))
+
+# need to transpose for matrix multiplication
+covariance_matrix <- correlation_matrix * stdevs %*% t(stdevs) 
+
+covariance_matrix
+```
+
+The important thing to note here, that our simulations reinforce is that for the sake of the Between Subjects ANOVAs **all values off of the diagonal are effectively zero**. Therefore the Between Subjects ANOVA is only concerned with the relationships (equivalence) of values along the diagonal.
+
+Let kick this up to within subjects (repeated measures) designs.
+
+# Within Subjects example
+
+Lets start by generating a Group-Condition, `A`. We'll create the same values as before
+
+```{r}
+set.seed(1)
+A <- rnorm(n = 50, mean = 60, sd = 7)
+```
+
+However, this time, instead of generating `B` and `C` independently, we will psuedo-randomly generate these scores based on `A`: where `B` is 5 greater than `A` plus or minus some random noise, and `C` is 5 greater than `B` plus or minus noise.
+
+```{r}
+B <- A + 5 + runif(50) - runif(50)
+C <- B + 5 + runif(50) - runif(50)
+```
+
+Now lets run our auto-correlations and between conditions correlations:
+
+```{r}
+#auto correlations all equal 1
+aa <- cor(A,A)
+bb <- cor(B,B)
+cc <- cor(C,C)
+
+# cross condition correlations
+ab <- cor(A,B)
+ac <- cor(A,C)
+ba <- ab # mirrors
+bc <- cor(B,C)
+ca <- ac
+cb <- bc
+```
+
+and finally build the correlation matrix:
+
+```{r}
+correlation_matrix <- matrix(c(aa, ab, ac,
+                               ba, bb, bc,
+                               ca, cb, cc),
+                             ncol = 3)
+
+rownames(correlation_matrix) = c("A", "B", "C")
+colnames(correlation_matrix) = c("A", "B", "C")
+
+correlation_matrix %>% round(3)
+```
+
+As we see in this case, scores in each condition are very strongly correlated with one another (the off-diagonal correlations). We can then take a look at the covariance matrix by cross multiplying by our group standard deviations. (Or, again, since we had the original data, I suppose we could have just taken the `cov()` of each column)
+
+```{r}
+stdevs <- c(sd(A), sd(B), sd(C))
+
+# need to transpose for matrix multiplication
+covariance_matrix <- correlation_matrix * stdevs %*% t(stdevs) 
+
+covariance_matrix
+```
+
+The covariance matrix above represents a case on near-compound-symmetry. This would be as close to the perfect sphericity as we would expect given generated data. I really wouldn't expect these clean of values ever from my empirical data.
+
+# What all of this means
+
+Hopefully, the above example captures how we can use the variance / co-variance matrix to assess how strongly the data in our conditions (and groups) is correlated with one another. For example, I can easily transform back and forth between covariances and correlations using the standard deviations of my groups. For example, going from covariance to correlation:
+
+```{r}
+covariance_matrix / stdevs %*% t(stdevs)
+```
+
+So, our assessment of sphericity is an assement of the degree to data in each condition's data is correlated with one another, where the ideal scenario is that data in each group is perfectly correlated with the other groups (note this **does not mean** that the data is indentical, just strongly correlated).
+
+# Sphericity demonstration calculator
+
+With this in mind we can build a calculator example to better understand how devations in correlations result in deviations away from the sphericity assumption. Here we can start with our correlations, use those values to generate hypothetical data, and work our way back. In the code below, you can alter the group means `mu` and standard deviations `stddev`, as well as the between condition correlations.
+
+## Build correlation matrix
+
+```{r}
+library(MASS)
+library(tidyverse)
+
+set.seed(5)
+
+# YOU CAN CHANGE ME
+mu <- c(4.23, 3.01, 2.91) # group means
+stddev <- c(2, 2, 2) # group standard devs
+
+# correlations (variances, DO NOT CHANGE)
+aa = 1
+bb = 1
+cc = 1
+
+# correlations (covariances, a to b, a to c, b to c, CHANGE)
+ab = .3
+ac = .6
+bc = .1
+```
+
+Based upon your changes you can not build the appropriate correlation matrix
+
+```{r}
+# DO NOT ALTER
+
+ba = ab #mirror
+ca = ac
+cb = bc
+
+corMat <- matrix(c(aa, ab, ac,
+                   ba, bb, bc,
+                   ca, cb, cc),
+                 ncol = 3)
+
+corMat
+```
+
+## build a covariance matrix
+
+Now to create the covariance matrix
+
+```{r}
+covMat <- stddev %*% t(stddev) * corMat
+covMat
+```
+
+## build simulated data
+
+you can use this code to build out simulated data based on the parameters you have entered above:
+
+```{r}
+df <- mvrnorm(n = 212, # number of participants
+              mu = mu, # means from above
+              Sigma = covMat, # covariance matrix from above
+              empirical = TRUE) %>%
+  data.frame()
+names(df) <- c("A","B","C")
+df
+```
+
+## Analyze for Homogeneity of Sums minus Covariances:
+
+And finally check for the similarity of the Sums minus Covariances of each pairwise comparison. Note how the resulting values deviate from one another as you change the variances of each group and the correlations between groups from the start.
+
+```{r}
+varA <- var(df$A)
+varB <- var(df$B)
+varC <- var(df$C)
+
+covAB <- cov(df$A, df$B)
+covAC <- cov(df$A, df$C)
+covBC <- cov(df$B, df$C)
+
+AB <- varA + varB - 2*covAB
+AC <- varA + varC - 2*covAC
+BC <- varB + varC - 2*covBC
+
+list("A to B" = AB, "A to C" = AC,"B to C" = BC)
+```

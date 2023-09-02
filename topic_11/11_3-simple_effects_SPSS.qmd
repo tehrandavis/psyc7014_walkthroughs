@@ -1,0 +1,7 @@
+---
+title: "Simple Effects in SPSS"
+---
+
+As I mentioned in class, given that we are doing our analyses via programming, we have the luxury of have a function in `emmeans` that can make all of our simple effects adjustments for us. If you are using the GUI method in SPSS, you don't have this luxury (although you can certainly create a similar function in SPSS!). Fear not, here I walk you through how to do this in SPSS, assuming you have Microsoft Excel.
+
+{{< video https://www.youtube.com/embed/0Y-dVv-UCz4 >}}

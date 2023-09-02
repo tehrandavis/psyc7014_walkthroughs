@@ -1,0 +1,107 @@
+---
+title: "Objects, assignment, and functions"
+---
+
+**Note**: there is a video (maybe a little dated) that accompanies this walkthrough. It can be found at
+
+[Computations, Operations, Data Structures \@ youtube](https://www.youtube.com/watch?v=DZvu44PNNKk&list=PLLv6V3KCs8wMoc5i2YT1YCmZudgne7Xzj&index=3)
+
+## Assignment and Objects
+
+In some of our earlier examples we ran a simple mathematical operation:
+
+```{r}
+2+2
+```
+
+We can save any operation (mathematical or other) that we perform in `R` in an `object`. In `R` this accomplished using the `<-` operator. This can be accompanied by typing `<` and `-` or by a keyboard shortcut. [Here's a cheatsheet](https://www.rstudio.com/wp-content/uploads/2016/01/rstudio-IDE-cheatsheet.pdf) with a whole lot of info for `RStudio`. As you progress through the semester I recommend coming back to this cheatsheet. For now, look for the keyboard shortcuts for `Insert <-` and `Run current line/selection`.
+
+Now let's save the above operation to an object named `x`. Run each of the lines separately
+
+```{r}
+x <- 2+2
+x
+x^2
+x*100
+```
+
+Note that objects can contain more than numbers. For example they can contain names:
+
+```{r, eval=FALSE}
+x <- "Tehran"
+x
+x^2 # this won't work... you can't square "Tehran"
+x*100
+class(x)
+```
+
+and logicals:
+
+```{r}
+x <- 2+2==4
+class(x)
+y <- 2+2==5
+class(y)
+```
+
+## Vectors and Matrices
+
+While objects can contain single values, more often they are more complex, containing multiple values:
+
+```{r}
+x <- c(2,4,6,8,10,12)
+x
+x^2
+x*100
+x==4
+class(x)
+
+```
+
+We call the above a `vector`, it has a 1-dimensional data structure (think of it as a line of data). Note that we can also hold multi-dimensional data in `matrices` and `data frames`. For example, let's transform our vector `x` into a 3 (rows) x 2 (columns) matrix `y`:
+
+```{r}
+y <- matrix(data = x,nrow = 3)
+y
+```
+
+For those of you that are familiar with matrix algebra, you can have fun thinking about what operations you can perform from here. However, for now we'll just move on. However, before doing so, let's take note of what's been going on in the **History** and **Environment** tabs.
+
+## Data Frames
+
+You typically won't create a data frame from scratch, but it's probably the most important data structure you will use. Data that you import often takes this format. We'll take more about data frames in the next workshop.
+
+## a bit on functions
+
+This week you are going to encounter a number of built in functions including `c()`, `install.packages()`, and `View()`. Functions are commands in `R` that perform some programmed operation given the input parameters. For example, taking our vector `x` we can find the mean using:
+
+```{r}
+mean(x)
+```
+
+where `mean()` is the function and `x` is the input parameter. Some functions take several parameters. For example:
+
+```{r}
+cars
+plot(x=cars$speed, y=cars$dist, col="blue")
+```
+
+`plot()` is our function `x` parameter for values on x-axis `y` parameter for values on y-axis `col` color to plot the points
+
+One of the most useful things about programming is that you can create your own functions. We'll come back to more complex version of this later in the semester. But for now here is an example that takes whatever numerical value is in it and multiplies it by two:
+
+```{r by_two function}
+byTwo <- function(x){
+  x*2
+}
+```
+
+And now to run it.
+
+```{r}
+byTwo(2)
+byTwo(4)
+byTwo(x)
+```
+
+FWIW, this is a totally useless function... but simple enough.

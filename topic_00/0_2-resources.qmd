@@ -1,0 +1,27 @@
+---
+title: "Links to resources"
+---
+
+## DataCamp for Classrooms
+
+In this course, we will incorporate DataCamp for Classrooms as a resource to supplement your learning experience. DataCamp [(http://www.datacamp.com)](http://www.datacamp.com) is an online platform that offers interactive, hands-on coding challenges and video tutorials to help you master data science skills at your own pace.
+
+To provide with the best learning experience, I have carefully curated a selection of DataCamp courses that align with the course curriculum and reinforce key concepts. By using DataCamp for Classrooms, you will:
+
+-   **Learn by doing:** Practice your coding skills with real-world datasets and guided exercises designed to test your understanding of statistical concepts and R programming.
+-   **Receive instant feedback:** Get personalized feedback on your progress and identify areas for improvement with DataCamp's smart assessment system.
+-   **Access expert content:** Benefit from a wealth of knowledge provided by experienced instructors who are leaders in their respective fields.
+-   **Track your progress:** Monitor your learning journey with DataCamp's intuitive dashboard, which highlights your achievements and completed courses.
+-   **Collaborate with peers:** Engage with fellow students in a dynamic learning environment where you can share ideas, discuss course material, and learn from each other's experiences.
+
+A sign-up link to DataCamp is posted in the courses CANVAS page. Once you have signed up, you will be able to access the DataCamp courses that I have assigned to you. You will be able to complete these courses at your own pace (save for the first 3 weeks), and you will have free access to DataCamp for the duration of the course.
+
+## Class YouTube Channel
+
+In addition to DataCamp, I have put together a YouTube channel that will serve as a supplementary resource for this course. The channel will feature a variety of content, including:
+
+**Brief instructional videos:** These concise videos will offer clear explanations and step-by-step guidance on various topics covered in the course, making it easier for you to grasp complex concepts and techniques.
+
+**SPSS examples:** To broaden your skillset, I will demonstrate how to perform similar analyses in SPSS when applicable. This will give you valuable insights into alternative statistical software and help you become more versatile in your data analysis capabilities (that and many of your PIs use SPSS).
+
+**"Do Some Data with Me" sessions:** These are in-depth, real-time data analysis sessions where you can observe my thought process and decision-making throughout the analysis. These interactive sessions will allow you to practice performing the analysis and writing the code alongside me, reinforcing your understanding of the material and building your confidence in tackling real-world data challenges.

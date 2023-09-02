@@ -1,0 +1,61 @@
+---
+title: "Bias in sample variance estimates"
+---
+
+One thing to note is that you can perform a sampling distribution of any of the statistical moments / measures of central tendency: mean, median, standard deviation, variance, skew, kurtosis.
+
+This following example is taken from **Barry Cohen on Biased and Unbiased Sample Variances**. It's very much related to the discussion of biased parameter estimates in ______
+
+> The problem is that the variance of the sample tends to underestimate the variance of the population. Of course, the variance of every sample will be a little different, even if all of the samples are the same size and they are from the same population. Some sample variances will be a little larger than the population variance and some a little smaller, but unfortunately the average of inﬁnitely many sample variances (when calculated by the formula above) will be less than the population variance. This tendency of a sample statistic to consistently underestimate (or overestimate) a population parameter is called bias. The sample variance as deﬁned by the (unnumbered) formula above is therefore called a biased estimator.
+
+We can demonstrating this fact by building a sampling distribution of variances. Let's load in our packages
+
+```{r}
+pacman::p_load(tidyverse, radiant, cowplot)
+```
+
+
+First let's create a population of 2000 people using `rnorm`, with a known mean of 100 and standard deviation of 15. Note that these are the distributions parameters:
+
+```{r}
+# this ensures that your data is like my data
+set.seed(1) 
+# generate "random" values resulting in a mean ≈ 100; sd ≈ 15
+population <- rnorm(n = 2000, mean = 100,sd = 15)
+# check our mean and variance
+mean(population)
+radiant.data::sdpop(population)^2
+```
+
+So our variance of this population is about 241.93. Note that `radiant.data::sdpop()` uses the formula for population variance (actually it's standard deviation, but you see we squared it). However, if we were to apply this formula to a specific sample, Cohen claims that our estimate of sample variance would be biased. Let's build up a sampling distribution comparing the biased estimate from `radiant.data::sdpop()` and our unbiased estimate from `sd()^2`
+
+Now to draw `R` number of samples of `N` people from this population
+
+```{r}
+# number of resamples
+R <- 1000
+# size of samples
+N = 20
+
+single_samp <- sample(population,size = 20)
+
+variance_dist <- tibble(num = 1:R) %>% 
+    group_by(num) %>% 
+    mutate(means = mean(sample(population, size = N, replace = TRUE)),
+           bias_variances = radiant.data::sdpop(sample(population, size = N, replace = TRUE))^2,
+           unbias_variances = sd(sample(population, size = N, replace = TRUE))^2
+           )
+```
+
+Comparing the population variance to the average biased variance and the average unbiased variance.
+
+```{r}
+sprintf("population var: %.2f", radiant.data::sdpop(population)^2) # population variance
+sprintf("biased var: %.2f",mean(variance_dist$bias_variances)) # mean of bias variance
+sprintf("unbiased var: %.2f",mean(variance_dist$unbias_variances)) # mean of unbiased variance
+```
+
+We see that the unbiased variance (239.78) is much closer to the true population variance (241.92) than the biased variance (230.92).
+
+
+

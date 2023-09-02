@@ -1,0 +1,17 @@
+# Preface {.unnumbered}
+
+<div class="cover-image-container">
+  <img src="images/cover.png" alt="Cover Image" class="cover-image" width = 45% align = "right">
+</div>
+
+Welcome to the PSYC 7014 Walkthroughs, a resource designed to complement your weekly readings and provide hands-on reinforcement of statistical analysis techniques using R. These walkthroughs have been crafted to enhance your learning experience by offering practical insights into descriptive statistics, data visualization, t-tests, regression, and ANOVA. Each topic is structured to deepen your understanding and refine your application of vital concepts.
+
+Emphasizing practical learning through R, a programming language widely used for statistical analysis, these walkthroughs guide you through examples and exercises that cultivate your ability to translate theory into actionable insights. Rather than focusing solely on formulas and theories, our approach empowers you with skills to confidently navigate and analyze complex datasets.
+
+Individual topics and sections can be found on the left sidebar.
+
+# Using these walkthoughs
+
+Each page, similar to your homework assignments, integrates sections containing both text and code chunks. Within each code chunk, you'll find a button that facilitates copying its contents directly to your clipboard. Afterward, you can conveniently paste this copied code into RStudio and execute it.
+
+Note that the code used to generate these walkthroughs is available for download at this [GitHub repository: https://github.com/tehrandavis/psyc7014_walkthroughs](https://github.com/tehrandavis/psyc7014_walkthroughs)

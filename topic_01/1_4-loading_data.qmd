@@ -1,0 +1,78 @@
+---
+title: "Loading in Data"
+---
+
+
+## A bit about file types
+
+Typically the file types that are used by beginners in `R` are plain text and delimited. They may have the extension "txt", "csv", or "dat" for example. These may become more sophisticated you progress, for example you can load in proprietary types like SPSS and STATA, but for this course we will mostly use plain text files (although later in the course I will show you how to load in Excel files and SPSS files).
+
+## Loading in local data using a GUI:
+
+As with loading packages, you can also load in a file containing data using the RStudio GUI. See [this video](https://youtu.be/NqvxpK495iU).
+
+As with installing packages, this is only preferred if you are not sharing your analysis. If you are sharing your analysis (as in this class) you need to import data using the command line. Fortunately, RStudio creates the appropriate command-line for you to copy and paste. For example the general format for loading in a csv file is:
+
+```{r}
+#| eval: false
+
+library(tidyverse)
+df_assigned_name <- read_csv("path/to/filneame.csv")
+```
+
+Where `df_assigned_name` is the name of the object you want to assign the data to, and `path/to/filename.csv` is the path to the file you want to load in. For example, if I wanted to load in the file `LexicalDescisionData.csv` from the folder `practice_datasets` in my current working directory, I would run the following:
+
+```{r}
+
+```{r}
+#| eval: false
+
+library(tidyverse)
+LexicalDescisionData <- read_csv("practice_datasets/LexicalDescisionData.csv")
+```
+
+
+## Importing data from the web
+
+You might be saying to yourself, "but, Tehran, the entire reason you've got us learning `R` is for transparency and openness with our data. How would I be able to share in my code a data file that resides on my hard drive?!?""
+
+Correct, you can't, but you can upload it to the internet and someone can access it from an online repository. Personally, I like to use [http://www.github.com](**Github**), but we'll save that for some advanced stuff later in the semester for those so inclined. Another alternative is to upload your entire folder to a project in [http://www.rstudio.cloud](**RStudio.cloud**).
+
+If the data is uploaded directly from the web, we can load it in using the `read_delim()` function from above. This is some reaction time data taken from a website. Let's assign it to an object `RxData`
+
+
+
+```{r}
+#| eval: false
+library(tidyverse) # no need to ask if already loaded
+alcohol_use_data <- read_csv("http://tehrandav.is/courses/statistics/practice_datasets/alcuseN6.csv", col_names = T)
+
+```
+```{r}
+#| echo: false
+
+library(tidyverse) # no need to ask if already loaded
+alcohol_use_data <- read_csv("../practice_datasets/alcuseN6.csv", col_names = T)
+```
+
+To see what's going on with the additional calls in this line, run the following line to get help:
+
+```{r}
+#| eval: false
+? read_csv
+```
+
+A document file should show up in your help tab, containing examples and describing what different arguments are doing. Search for `col_names` and try to figure out what's going on.
+
+## Looking ahead...
+
+This is probably a good place to stop for now. In the meantime try running the following 4 commands (assuming that you have imported alcohol_use_data) and think about what they are returning:
+
+```{r}
+#| eval: false
+
+class(alcohol_use_data)
+names(alcohol_use_data)
+head(alcohol_use_data)
+summary(alcohol_use_data)
+```

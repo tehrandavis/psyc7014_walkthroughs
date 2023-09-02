@@ -1,0 +1,249 @@
+---
+title: 'Power'
+---
+
+```{r}
+pacman::p_load(tidyverse, cowplot, glue)
+```
+
+**I guess every superhero needs his theme music**
+
+Power is the answer to the second question for the previous section: "How strong would a potential treatment effect in a future experiment need to be in order for us to detect it?" More precisely it is the likelihood that a study will detect an effect when there is an effect. Mathematically we can express power as $1 - \beta$, where $\beta$ = Type II error (Cohen, 1962, 1988, 1992). Below is a visual representation of power.
+
+```{r, echo=FALSE, fig.width=6.25,fig.height=3.0}
+m1 <- 0  # mu H0
+sd1 <- 1.5 # sigma H0
+m2 <- 3.5 # mu HA
+sd2 <- 1.5 # sigma HA
+
+z_crit <- qnorm(1-(0.05/2), m1, sd1)
+
+# set length of tails
+min1 <- m1-sd1*4
+max1 <- m1+sd1*4
+min2 <- m2-sd2*4
+max2 <- m2+sd2*4          
+# create x sequence
+x <- seq(min(min1,min2), max(max1, max2), .01)
+# generate normal dist #1
+y1 <- dnorm(x, m1, sd1)
+# put in data frame
+df1 <- data.frame("x" = x, "y" = y1)
+# generate normal dist #2
+y2 <- dnorm(x, m2, sd2)
+# put in data frame
+df2 <- data.frame("x" = x, "y" = y2)
+
+# Alpha polygon
+y.poly <- pmin(y1,y2)
+poly1 <- data.frame(x=x, y=y.poly)
+poly1 <- poly1[poly1$x >= z_crit, ] 
+poly1<-rbind(poly1, c(z_crit, 0))  # add lower-left corner
+
+# Beta polygon
+poly2 <- df2
+poly2 <- poly2[poly2$x <= z_crit,] 
+poly2<-rbind(poly2, c(z_crit, 0))  # add lower-left corner
+
+# power polygon; 1-beta
+poly3 <- df2
+poly3 <- poly3[poly3$x >= z_crit,] 
+poly3 <-rbind(poly3, c(z_crit, 0))  # add lower-left corner
+
+# combine polygons. 
+poly1$id <- 3 # alpha, give it the highest number to make it the top layer
+poly2$id <- 2 # beta
+poly3$id <- 1 # power; 1 - beta
+poly <- rbind(poly1, poly2, poly3)
+poly$id <- factor(poly$id,  labels=c("power","beta","alpha"))
+
+ggplot(poly, aes(x,y, fill=id, group=id)) +
+  geom_polygon(show.legend=F, alpha=I(8/10)) +
+  # add line for treatment group
+  geom_line(data=df1, aes(x,y, color="H0", group=NULL, fill=NULL), size=1.5, show.legend=F) + 
+  # add line for treatment group. These lines could be combined into one dataframe.
+  geom_line(data=df2, aes(color="HA", group=NULL, fill=NULL),size=1.5, show.legend=F) +
+  # add vlines for z_crit
+  geom_vline(xintercept = z_crit, size=1, linetype="dashed") +
+  # change colors 
+  scale_color_manual("Group", 
+                     values= c("HA" = "#981e0b","H0" = "black")) +
+  scale_fill_manual("test", values= c("alpha" = "#0d6374","beta" = "#be805e","power"="#7cecee")) +
+  # beta arrow
+  annotate("segment", x=0.1, y=0.045, xend=1.3, yend=0.01, arrow = arrow(length = unit(0.3, "cm")), size=1) +
+  annotate("text", label="beta", x=0, y=0.05, parse=T, size=8) +
+  # alpha arrow
+  annotate("segment", x=4, y=0.043, xend=3.4, yend=0.01, arrow = arrow(length = unit(0.3, "cm")), size=1) +
+  annotate("text", label="frac(alpha,2)", x=4.2, y=0.05, parse=T, size=8) +
+  # power arrow
+  annotate("segment", x=6, y=0.2, xend=4.5, yend=0.15, arrow = arrow(length = unit(0.3, "cm")), size=1) +
+  annotate("text", label="1-beta", x=6.1, y=0.21, parse=T, size=8) +
+  # H_0 title
+  annotate("text", label="H[0]", x=m1, y=0.28, parse=T, size=8) +
+  # H_a title
+  annotate("text", label="H[1]", x=m2, y=0.28, parse=T, size=8) +
+  ggtitle("Power Example") +
+  # remove some elements
+  theme(panel.grid.minor = element_blank(),
+             panel.grid.major = element_blank(),
+             panel.background = element_blank(),
+             plot.background = element_rect(fill="#ffffff"),
+             panel.border = element_blank(),
+             axis.line = element_blank(),
+             axis.text.x = element_blank(),
+             axis.text.y = element_blank(),
+             axis.ticks = element_blank(),
+             axis.title.x = element_blank(),
+             axis.title.y = element_blank(),
+             plot.title = element_text(size=22))
+```
+
+## Truth and no truth to power
+
+In your travels you are likely to encounter two kinds of power estimates, **a priori power** and **a posteriori power**. **A priori** power fits with our description above, and is calculated **before** one conducts their experiment. **A posteriori power** is calculated **after** the experiment is completed, and asks provided the observed *effect size* what is the power that you achieved. One of these two is better than the other... in fact just say no to **a posteriori**, or **post-hoc / observed** power (the latter term shows up in SPSS). As a measure, it is so directly tied to you obtained *p-value* as to be rendered essentially meaningless, and does not really answer the question that power analysis intends to address.
+
+## Finding power
+
+The calculation of power takes into consideration 3 factors:
+
+1.  what is the size of the effect of your treatment / manipulation
+2.  how large of a sample do you have to amplify your effect
+3.  what is the criterion by which you will measure if the effect is detected.
+
+To squeeze every last drop out of the radio metaphor we can think of this as:
+
+1.  what is the characteristic of the original signal relative to noise
+2.  how much of a boost can you give that signal (how many antennae is it emitted from)
+3.  how sensitive is the receiving antenna that tunes in the signal and tunes out the noise.
+
+In statistical terms these are:
+
+1.  your effect size
+2.  your sample size
+3.  your $\alpha$ (alpha) value (e.g, $p<.05$)
+
+As experimenters, we can manipulate any of these 3 components to increase the power of our design, though due to practical or theoretical constraints tend to focus on sample size and alpha value. Assuming that we allow effect size to remain constant (that is we don't try to enhance or exaggerate the effect, see the Cohen textbook for examples) we can calculate power as such:
+
+**Calculating a priori Power** Involves setting a specific likelihood (power = .80) at given $\alpha$ level (.05), given a known effect size. This is typically used to estimate the sample size needed to achieve that power (i.e., how much of a signal boost do we need). A key problem here is determining the proper effect size? One suggestion is to survey the literature for independent experiments and meta-analyses and use their results as a guide. BUT, one important thing to consider is that due to publication bias, those results are likely to be overestimates (only effects that are significant are reported, see Kicinski et al., 2015). Some other rules of thumb, assume your effect is small-to-medium (d = .3 or .4).
+
+**Post-hoc Power** is estimated given the *observed* effect size you found from your study, the sample size and $\alpha$ you set. As I mentioned post-hoc power doesn't really have much value. See [here](http://daniellakens.blogspot.com/2014/12/observed-power-and-what-to-do-if-your.html) for a more detailed discussion.
+
+## Estimating A priori Power
+
+Here we aim to ensure a specific likelihood that we will find a significant effect ($1-\beta$). There are two likelihood values that are often chosen for power: .8 and .95. 80% power is the value suggested by Cohen because it's economical. 95% is called high power, and it has been favored of late (but its very expensive and you will see why). To calculate power, we need 3 pieces of information. 1) Effect size (in Cohen's $d$), 2) your $\alpha$ level, and 3) a number of tails you want to set (usually 2-tailed).
+
+To calculate power in `R` we can use the `pwr` package. It should already be installed on your computer (it comes with `R`), but if for some reason it is not, you can re-install it. In our explanation of power thus fair we have discussed it in the context of comparing two means, as we would in a t-test. Let's start by performing a power analysis using this example.
+
+For example let's assume that we are attempting to achieve a power of `.80` given an effect size (d) of `.4` and an $\alpha$ of `.05` when comparing two means in a independent samples t-test. Here we would use the `pwr.t.test` function in the `pwr` package.
+
+`pwr.t.test` works by solving what you leave as `NULL`.
+
+```{r}
+library(pwr)
+pwr.t.test(n = NULL, d = .4, power = .80, sig.level = 0.05,
+               type = c("two.sample"), alternative = c("two.sided"))
+```
+
+Here it is telling me that in order to achieve my desired power I would need to recruit 99 participants for each group. Conversely, if this was a paired samples t-test:
+
+```{r}
+pwr.t.test(n = NULL, d = .4, power = .80, sig.level = 0.05,
+               type = c("paired"), alternative = c("two.sided"))
+```
+
+I would need to recruit 51 participants (again showing you repeated measures designs are more powerful).
+
+What happens if I bump my desired power up to .95?
+
+```{r}
+pwr.t.test(n = NULL, d = .4, power = .95, sig.level = 0.05,
+               type = c("paired"), alternative = c("two.sided"))
+pwr.t.test(n = NULL, d = .4, power = .95, sig.level = 0.05,
+               type = c("two.sample"), alternative = c("two.sided"))
+```
+
+In this case I need to add about 30 more participants in the paired-samples case and about 64 participants to EACH group in the independent samples case.
+
+## Sample size and Power (diminishing returns)
+
+Sample size and power at a given effect size have a non-linear relationship, such that eventually you hit a wall in how much of an increase in power you get with each increase in sample size. Keeping in mind that `pwr.t.test` works by solving what you leave as `NULL`, we can calculate power given our estimated effect size, our alpha, and our likely sample size. Say for example we have a treatment with an estimated effect of $d=.40$. Given our budget, we are limited to collecting no more than 50 participants total (25 in each group). We can then ask ourselves how powerful is our design (what is the likelihood of detecting an effect given it is there).
+
+```{r}
+pwr.t.test(n = 50, d = .4, power = NULL, sig.level = 0.05,
+               type = c("two.sample"), alternative = c("two.sided"))
+```
+
+Here our power is .51, indicating that we have a 51% chance of detecting an existing effect. This study may not be worth the time, money, and effort. What if we could run this as a paired test:
+
+```{r}
+pwr.t.test(n = 50, d = .4, power = NULL, sig.level = 0.05,
+               type = c("paired"), alternative = c("two.sided"))
+```
+
+Now our power approaches 80%. This might be a good study to run.
+
+Lets take a look at some power curves, with a priori power as a function of sample size:
+
+```{r, echo=FALSE}
+library(pwr)
+OneSample.T.N<-function(Nrange,D)
+  {N<-pwr.t.test(n = Nrange, d = D, power = NULL, sig.level = 0.05,
+               type = c("one.sample"), alternative = c("two.sided"))$power
+  return(N)
+  }
+
+Nrange=seq(2,200,.5)
+
+med_Power<-mapply(OneSample.T.N,Nrange,D=.4)
+
+plot_med <- tibble(Nrange,med_Power) %>% 
+  ggplot(., aes(x=Nrange, y=med_Power)) +
+    geom_line() + 
+    labs(title = "Power Curve, d = .4, alpha = .05/2",
+         x="Sample Size", y="Apriori Power") +
+    theme_cowplot()
+
+lrg_Power<-mapply(OneSample.T.N,Nrange,D=.8)
+
+plot_lrg <- tibble(Nrange,lrg_Power) %>% 
+  ggplot(., aes(x=Nrange, y=lrg_Power)) +
+    geom_line() + 
+    labs(title = "Power Curve, d = .8, alpha = .05/2",
+         x="Sample Size", y="Apriori Power") +
+    theme_cowplot()
+
+plot_grid(plot_med, plot_lrg)
+```
+
+As you can see, the larger the effect the fewer subjects you need. At the same time both curve plateau suggesting that about a certain sample size your gains in power are inconsequential.
+
+## Power and effect size
+
+In a similar vein we address this question: what is the smallest effect size that we can hope to detect given our design. Lets assume we can collect no more than 25 participants and desire a power level of .80.
+
+Again using `pwr.t.test`, setting our desired power at .80 and leaving `d` NULL:
+
+```{r}
+pwr.t.test(n = 100, d = NULL, power = .8, sig.level = 0.05,
+               type = c("paired"), alternative = c("two.sided"))
+```
+
+## Regression example
+
+We can also estimate power of simple regression analyses using this package and the `pwr.f2.test`. In this case we need to know our
+
+-   desired `power`
+-   numerator degrees of freedom, `u`
+-   denominator degrees of freedom, `v`
+-   the effect size, $R^2$, `f2`
+-   and our significance level
+
+As above, whatever is left `NULL` is what's calculated. For example, how many participants would we need to detect an `R^2` of .39, at a desired power of .80 assuming a simple regression (where our numerator df = 1)
+
+```{r}
+pwr.f2.test(u = 1,v = NULL,f2 = .39,power = .80)
+```
+
+This output tells us that our denominator df would need to be about 20. Knowing the relationship between $N$ and the denominator df in simple regression suggests I would need 22 participants.
+
+You can check out this [link for more detail about the power package](https://www.statmethods.net/stats/power.html)

@@ -1,0 +1,8 @@
+/.quarto/
+/_book/
+
+*.DS_Store
+*.html
+
+/.luarc.json
+.Rproj.user

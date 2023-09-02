@@ -1,0 +1,69 @@
+---
+title: "The structure of your data"
+---
+
+## What is the structure of your data file?
+
+Last week we covered how to import data from file into an `R` data frame. Before taking any next steps with your analysis, you first should take a moment to understand the structure of your data. Every statical software wants the data to have a particular format, `R` included. One thing that you will need to be sensitive of is that not every bit of software (or even atype of analysis) wants the data in the same format. In order to perform the appropriate analyses, you need to have the data in the right formatting structure. One crucial issue that confronts many first time users coming from SPSS is whether the data is in WIDE or LONG format.
+
+Let's load some example data. Note that because this is a tab-delimited csv file, I am using the `read_table()` function. When in doubt, you can also use the GUI method to import data and then copy the appropriate code:
+
+```{r}
+# loading in the packages, see "Week 1: Leveling up
+pacman::p_load(tidyverse) 
+reading_data <- read_table("https://tehrandav.is/courses/statistics/practice_datasets/reading.txt", col_names = T)
+```
+
+```{r}
+reading_data
+```
+
+These are data taken from a study by Baumann, Seifert-Kessell, and Jones (1992). Per a description of these data can be found in David Flora's wonderful textbook for modeling (p. 91): Sixty-six students in Grade 4 were randomly assigned to receive one of three interventions designed to improve reading comprehension. The participants were evenly distributed (n = 22 per intervention group) among an 'instructional control' group, a 'Directed Reading-Thinking Activity' (DRTA) group, and a 'Think Aloud' (TA) group. After each group received its respective intervention, the participants completed an error-detection test designed to evaluate their reading comprehension. The 2 pretest scores represent the number of errors prior to intervention, while the 3 posttest scores were taking post-intervention.
+
+For the purposes of this example, I'm going to trim the 7 columns in the original set to four: `id`, `group`, `pretest1`, and `posttest1`. To do this I need the `select` function from the `tidyverse`:
+
+```{r}
+pacman::p_load(tidyverse) #load in the tidyverse
+
+# pull out my columns of interest
+reading_data_select <- 
+    reading_data %>% 
+    select("id", "group", "pretest1", "posttest1")
+```
+
+This is a repeated measurement. Both columns `pretest1` and `posttest1` contain the same measure, test score and every participant went through both pre and post tests. Most important for present purposes this data is in `WIDE` format:
+
+- each line represents a participant 
+- columns represent scores taken from participants at different trials or times. 
+- The same measure, test scores, is spread out amount two columns depending on the time the test was measured, `pre` and `post`.
+
+However, while this might be intuitve for tabluar visualization, many statistical softwares prefer when `LONG` format, where each line represents a single *observation*, e.g. a participant-trial or participant-time (FWIW SPSS likes some mix of WIDE and LONG).
+
+\*\* \[See this page for a run down of WIDE v. LONG format\] (https://www.theanalysisfactor.com/wide-and-long-data/)
+
+\*\* More, for those that are interested I suggest taking a look at these two wonderful courses on DataCamp:
+
+-   [Working with Data in the Tidyverse](https://www.datacamp.com/courses/working-with-data-in-the-tidyverse)
+-   [Cleaning Data in R](https://www.datacamp.com/courses/cleaning-data-in-r)
+
+## Getting data from WIDE to LONG
+
+So the data are in WIDE format, each line has multiple observations of data that are being compared. Here both `pretest1` scores and `posttest1` scores are on the same line. In order to make life easier for analysis and plotting in `ggplot`, we need to get the data into LONG format (`pretest1` scores and `posttest1` scores are on different lines). This can be done using the `pivot_longer` function from the `tidyr` package.
+
+Before pivoting your data, one thing to consider is whether or not you have a column that defines each subject. In this case we have `id`. This tells `R` that these data are coming from the same subject and will allow `R` to connect these data when performing analysis. This watching will be crucially important later on when we perform t-tests and ANOVAs.
+
+**Using `pivot_longer()`:** This function takes a number of arguments, but for us right now, the most important are `data`: your dataframe; `cols`: which columns to gather; `names_to`: what do you want the header of the collaped nonminal variables to be? Here, we might ask what title would subsume both `pretest1` and `posttest1`. I'll choose `time` ; `values_to`: what do the values represent, here I choose `reading_score`:
+
+```{r}
+pivot_longer(reading_data_select,cols = c("pretest1","posttest1"),names_to = "time", values_to = "reading_score")
+```
+
+Compare this output to the original data frame. Notice that now we have a new column, `time`, that tells us whether the score was taken at pre or post test. We also have a new column, `reading_score`, that tells us the score at that time. This is the LONG format.
+
+Here is a good visual representation of what we just did with `pivot_longer()`—and how to get it back using `pivot_wider()`:
+
+![pivot_wider_and_longer()](../images/tidyr-pivoting.gif). 
+
+FWIW I found the above gif on this website: https://www.garrickadenbuie.com/project/tidyexplain/. The site also has some nice visualizations for other data wrangling functions, like joining data frames and filtering.
+
+For most of your analyses you are going to need to put your data in long format. Most of the datasets that I provide for homework will already be in this format, but some data that you pull from the web, or your own lab data may not. If that's the case, right after you import your data you will need to put it in the correct format (of if you prefer, do this in Excel).

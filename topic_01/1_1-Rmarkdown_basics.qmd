@@ -1,0 +1,139 @@
+---
+title: "Rmarkdown Basics"
+execute: 
+  eval: false
+---
+
+Note that much (but not all) of this is unnecessary assuming you use the **Visual** option in your source pane. That said you can still type markdown into your visual editor and it will auto-magically format things for you.
+
+## Hello there
+
+This is an example of a quarto markdown notebook. These notebooks have some pretty nifty features that allow you to perform both your analyses and your write-ups in the same environment.
+
+New notebooks can be opened by: **File \> New File \> Quarto Document**.
+
+## Markdown Basics
+
+One of the most useful features of these notebooks is that they allow you to write in markdown. Markdown is a simple syntax that allows you to format text. For example, you can make text **bold** by surrounding it with two asterisks, or *italics* by surrounding it with one. You can also make text `look like code` by surrounding it with backticks. You can also make headers by preceding text with a pound sign. For example, try typing the following into your editor:
+
+```{r}
+#| eval: false
+**bold text**
+```
+
+produces **bold text**, and
+
+```{r}
+#| eval: false
+_italics text_
+```
+
+renders *italics text*, and
+
+```{r}
+#| eval: false
+`code text`
+```
+
+makes `code text.`
+
+**More examples include:**
+
+```{r}
+#| eval: false
+# Header 1 (check out the TOC)
+```
+
+# Header 1 (check out the TOC)
+
+```{r}
+## Header 2
+```
+
+## Header 2
+
+```{r}
+### Header 3
+```
+
+### Header 3
+
+Also,
+
+```{r}
+- an unordered list
+- can be done like this
+```
+
+-   an unordered list
+-   can be done like this
+
+```{r}
+1. here is an example of
+2. an ordered (numbered) list
+```
+
+1.  here's and example of
+2.  an ordered (numbered) list
+
+and here is how you
+
+```{r}
+> blockquote some text
+```
+
+> blockquote some text
+
+are but a few that you may encounter. An expanded list can be found [here](https://www.rstudio.com/wp-content/uploads/2016/03/rmarkdown-cheatsheet-2.0.pdf). Which btw is how you embed weblinks. Heck you can even do mathematical equations. For example, here is the binomial probability.
+
+$$f(y|N,p) = \frac{N!}{y!(N-y)!}\cdot p^y \cdot (1-p)^{N-y} = {{N}\choose{y}} \cdot p^y \cdot (1-p)^{N-y}$$
+
+and this is how it was created:
+
+```{r}
+$$f(y|N,p) = \frac{N!}{y!(N-y)!}\cdot p^y \cdot (1-p)^{N-y} = {{N}\choose{y}} \cdot p^y \cdot (1-p)^{N-y}$$
+```
+
+Granted the syntax for this might seem daunting at first (and isn't required for this course), but just wanted to show you some of the things you can do. At the very least learning equation syntax might be useful for superscripts$^2$, subscripts$_2$, and mathematical symbols like $\alpha$, $\chi$, and $\sum$. I suppose fractions are pretty useful too:
+
+$$ fraction = \frac{numerator}{denominator}$$
+
+And here is how we do those
+
+```{r}
+$^2$ # superscript
+$_2$ # subscript 
+$\alpha$ # alpha
+$\chi$ # chi
+$\sum$ # sum
+$$ fraction = \frac{numerator}{denominator}$$ # fraction
+```
+
+
+# Marrying code and text
+
+Perhaps the most important aspects of using notebooks like this is that you can marry text and code. Code is placed in *chunks* starting with \`\`\`{r}. For example, try executing this chunk by clicking the **Run** button within the chunk or by placing your cursor inside it and pressing **Cmd+Shift+Enter** (Mac) or **Ctrl+Shift+Enter)** (Win).
+
+```{r}
+plot(cars)
+```
+
+You can add a new chunk by clicking the **Insert Code Chunk** button on the toolbar.
+
+To compile (print) the contents of this notebook you can click the **Render** button. Or, if you choose, you can export in into a *pdf* or *doc* using other *Knit* options. The first time you try this, `RStudio` may ask you to install a few packages. This only happens the very first time.
+
+You may have notice that the resulting output also prints the code. This may not be what you want. You can elect to hide code on a *by-chunk* basis by adding `#| echo: false` to the top of your chunk. You notice that there are several option options here as well, including hiding warnings, and using a custom figure size.
+
+Try toying around with these options on the chunk below:
+
+```{r}
+#| echo: false
+#| fig-height: 6
+#| fig-width: 6
+#| warning: true
+
+
+plot(cars, col="blue")
+```
+
+One last bit. By default, an `Quarto Document` executes all code inline, meaning the output shows up underneath the chuck. Depending on your preferences this may not be desirable. As an alternative you can elect to have the code sent to the `Console`. This can be accomplished the selecting the Preferences Gear button and selecting \`Chunk output console. Do this and re-run each of the chunks separately.

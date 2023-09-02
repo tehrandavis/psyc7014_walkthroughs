@@ -1,0 +1,95 @@
+---
+title: "Handling Violations of Linear Regression Assumptions"
+---
+
+This guide assumes you have the following libraries loaded:
+
+```{r}
+pacman::p_load(tidyverse, car, cowplot, MASS)
+```
+
+## 1. Addressing Non-Normal Residuals
+
+If the residuals of your regression model are not normally distributed, it can affect the validity of your hypothesis tests. Here's what you can do:
+
+### Log Transformation
+
+If your data is positively skewed, applying a log transformation can help in achieving normality.
+
+```{r}
+stress_data$lnSymptoms_log <- log(stress_data$lnSymptoms)
+lm_log <- lm(lnSymptoms_log ~ Stress, data = stress_data)
+```
+
+### Box-Cox Transformation
+
+The Box-Cox transformation is a family of power transformations that can help in stabilizing variance and making the data more normal.
+
+```{r}
+boxcox_trans <- car::powerTransform(stress_symptoms_model)
+lambda <- boxcox_trans$lambda[1]
+stress_data$lnSymptoms_boxcox <- (stress_data$lnSymptoms^lambda - 1)/lambda
+lm_boxcox <- lm(lnSymptoms_boxcox ~ Stress, data = stress_data)
+```
+
+## 2. Addressing Heteroscedasticity
+
+Heteroscedasticity refers to the circumstance in which the variability of a variable is unequal across levels of another variable. Here's how you can address it:
+
+### Weighted Least Squares (WLS)
+
+If you know the nature of the heteroscedasticity, you can use WLS. This involves giving a weight to each observation with the inverse of the known heteroscedastic variance.
+
+```{r}
+weights <- 1/stress_data$Stress
+lm_wls <- lm(lnSymptoms ~ Stress, data = stress_data, weights = weights)
+```
+
+### Robust Standard Errors
+
+If you're unsure about the nature of the heteroscedasticity, you can use robust standard errors which adjust the standard errors of the coefficients.
+
+```{r}
+coeftest(stress_symptoms_model, vcov = vcovHC(stress_symptoms_model, type = "HC1"))
+```
+
+## 3. Addressing Non-Linearity
+
+If the relationship between the predictors and the response is not linear, you can try:
+
+### Polynomial Regression
+
+This involves adding powers of the predictor to the model.
+
+```{r}
+lm_poly <- lm(lnSymptoms ~ poly(Stress, 2), data = stress_data)
+```
+
+### Adding Interaction Terms
+
+If you suspect that the effect of one predictor on the response variable depends on the level of another predictor, you can add an interaction term.
+
+```{r}
+lm_interaction <- lm(lnSymptoms ~ Stress * AnotherPredictor, data = stress_data)
+```
+
+## 4. Addressing Autocorrelation
+
+If residuals are correlated across observations (common in time series data), you can:
+
+### Use Time Series Models
+
+Consider models like ARIMA or exponential smoothing if your data is a time series.
+
+### Add Lagged Predictors
+
+You can include lagged values of predictors in your model.
+
+```{r}
+stress_data$lag_Stress <- lag(stress_data$Stress)
+lm_lag <- lm(lnSymptoms ~ Stress + lag_Stress, data = stress_data)
+```
+
+---
+
+Remember, always check the diagnostics of your model after making any adjustments to ensure that the assumptions are now met. If one method doesn't work, consider combining multiple methods or exploring other advanced techniques.

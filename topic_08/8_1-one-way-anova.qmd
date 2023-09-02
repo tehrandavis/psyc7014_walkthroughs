@@ -1,0 +1,446 @@
+---
+title: "The One-way ANOVA"
+---
+
+## ANOVAs for comparing means
+
+This week we covered **ANOVA**. A major emphasis in the material (especially Winter's optional text) is that ANOVA (much like many of the other tests that we cover in this course) is an extension of the general linear model. In many respects, ANOVA and regression are conceptually identical---whereas in linear regression our predictor variables are typically continuous (or, in some cases ordinal) we usually reserve the term ANOVA for instances when our predictors are discrete or nominal (although it really need not be). This would be the difference say in predicting weight as a function of height (linear regression) in contrast to weight as function of hometown (Dayton, Youngstown, Cleveland, Cincinnati). Given that the assigned readings (and the optional Winter text) do a wonderful job of explaining the underlying principles of ANOVA, I won't spend too much time here rehashing what is already available there. Both the Flora text and the Winter text, especially does an excellent job of demonstrating how even though regression and ANOVA are often treated differently in terms of research focus (e.g., observation v. experimentation) and data focus (correlation/goodness of fit v. comparing means) they are indeed one and the same. Here, my goal is to reinforce this idea using examples in `R`, as well as providing a practical tutorial that will serve as our entry point into ANOVA.
+
+We typically understand ANOVA as a method for allowing us to compare means from more than two samples. To see how this connects with what we have learned from regression lets use an example dataset. Before proceeding, this walk-through assumes that you have the following packages installed and loaded in R:
+
+```{r installing packages, warning = FALSE, message=FALSE}
+pacman::p_load(car,
+               cowplot, 
+               tidyverse,
+               psych)
+```
+
+## The data
+
+To start, lets download Eysenck's (1974) study on verbal recall and levels of processing. As described in Howell (2012):
+
+> Craik and Lockhart (1972) proposed as a model of memory that the degree to which verbal material is remembered by the subject is a function of the degree to which it was processed when it was initially presented. Thus, for example, if you were trying to memorize a list of words, repeating a word to yourself (a low level of processing) would not lead to as good recall as thinking about the word and trying to form associations between that word and some other word. Eysenck (1974) was interested in testing this model and, more important, in looking to see whether it could help to explain reported differences between young and old subjects in their ability to recall verbal material...
+>
+> Eysenck randomly assigned 50 subjects between the ages of 55 and 65 years to one of five groups---four incidental-learning groups and one intentional-learning group. (Incidental learning is learning in the absence of the expectation that the material will later need to be recalled.) The Counting group was asked to read through a list of words and simply count the number of letters in each word. This involved the lowest level of processing, because subjects did not need to deal with each word as anything more than a collection of letters. The Rhyming group was asked to read each word and think of a word that rhymed with it. This task involved considering the sound of each word, but not its meaning. The Adjective group had to process the words to the extent of giving an adjective that could reasonably be used to modify each word on the list. The Imagery group was instructed to try to form vivid images of each word. This was assumed to require the deepest level of processing of the four incidental conditions. None of these four groups were told that they would later be asked for recall of the items. Finally, the Intentional group was told to read through the list and to memorize the words for later recall. After subjects had gone through the list of 27 items three times, they were given a sheet of paper and asked to write down all of the words they could remember. If learning involves nothing more than being exposed to the material (the way most of us read a newspaper or, heaven forbid, a class assignment), then the five groups should have shown equal recall---after all, they all saw all of the words. If the level of processing of the material is important, then there should have been noticeable differences among the group means.
+
+We can download this `dataset` using the following code:
+
+```{r downloading dataset}
+dataset <- read_delim("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Ex11-1.dat", 
+                      delim = "\t")
+
+show(dataset)
+```
+
+## Getting the data in order
+
+Although the focus for this course is conceptual and applied knowledge of statistics, I again want to be mindful of the practice of data analysis. That is, in the real world, you'll be asked to do some **data wrangling,** or getting your data in the right format and containing the right information to properly proceed with analysis. When looking at this data, two important things jump out that we might want to address: (1) there is no column indicating participant ID. and (2) the data is numerically coded. A little bit about each of these points.
+
+### The importance of a participant ID column
+
+Depending on what statistical software you use, including a Participant ID column varies in its importance. For building statistical models in `R` that involve categorical data, including designs that that test within and across subjects making sure that you have Participant IDs coded is vitally important. Ideally this will already be done before you import your data, but on the case that it's not you need to add a column specifying participant ID. How you do this will depend on what format your data is in (Wide v. Long) and whether you have a repeated-measures design (multiple measures from each participant).
+
+\*\* I grant that it might be useful to use you Excel ninja skills here and get everything in its right place before importing, but will assume that you want to stay in an `R` environment.
+
+In this case, our data is in long format and we have a between subjects design. That is every line represents a single measure of a participant and every participant is represented only once. In this case we can just assign a unique number to each participant / row. In most cases this is a simple as assigning participant numbers {1,2,3...n}. An easy way to do this is to use the `seq_along()` function. The `seq_along()` function simply says to create numbers in sequence that match along a vector. In this case we can `seq_along` the `GROUP` column (vector).
+
+```{r}
+dataset <- dataset %>% mutate(PartID = seq_along(dataset$GROUP))
+dataset
+```
+
+FWIW, if you have the same compulsion that I do and insist that your `PartID` column is first in your dataset this can be solved using `select`. Here, I'm saying put `PartID` first and then follow it with `everything()` else.
+
+```{r}
+dataset <- dataset %>% select(PartID, everything())
+```
+
+OK. That's addressed. Now onto issue #2.
+
+### Recoding the factors (if number coded)
+
+As we can see the data is number coded. In this case,
+
+-   1 = 'Counting',
+
+-   2 = 'Rhyming',
+
+-   3 = 'Adjective',
+
+-   4 = 'Imagery' and
+
+-   5 = 'Intentional'
+
+My advice for what to do if you get dummy coded data is to create a corresponding column in your data set that contains the factors in nominal (name) format.
+
+Recall from previous weeks that we can use the `recode()` and `recode_factor()`functions to reassign the number variables. Here, we are recoding the levels of a factor, so the preferred function is `recode_factor()`. When we `recode_factor()` we have the added benefit of automatically *factorizing*, telling `R` to treat the IV as a factor. Let's create a new column `dataset$GROUP_FACTOR` that contains this data:
+
+```{r renaming dummy codes}
+# assigning the appropriate names for the dummy codes
+dataset <- dataset %>% 
+  mutate(GROUP_FACTOR = dplyr::recode_factor(GROUP, 
+                                             "1" = "Counting",
+                                             "2"="Rhyming",
+                                             "3"="Adjective",
+                                             "4"="Imagery",
+                                             "5"="Intentional"
+                                             )
+  )
+```
+
+### Renaming column headers (optional)
+
+And now, just to be clear, let's rename the original `GROUP` to `GROUP_NUM`. This can be accomplished by using the `dplyr::rename()` function.
+
+```{r}
+# The template is rename(NEW_NAME = OLD_NAME)
+dataset <- dataset %>% dplyr::rename(GROUP_NUM = GROUP)
+```
+
+[Check out this link](https://www.datanovia.com/en/lessons/rename-data-frame-columns-in-r/#renaming-columns-with-dplyrrename) for info on how to rename multiple columns at once using `names()` or `dplyr::rename()` from the `tidyverse`.
+
+### Reordering your levels
+
+One important question you should ask before you look at your data is "what is your **control** (group, condition)". Proper experimentation requires a proper control in order to properly isolate the influence of the manipulation (that's a lot of propers). Here, the best candidates for our control group might either be "Counting" or "Intentional", depending on how the original problem was approached. If the larger comparison involved "Intentional v. incidental" learning for recall, then the "Intentional" group serves best as your control. If the original question involved levels of processing, then "Counting"" (theoretically the lowest level of incidental processing) is best. Here I am assuming the latter (although I believe theoretically Eysenck originally was interested in the former).
+
+I bring this up, as its typically best to ensure that your control is entered first into the ANOVA model. To check the order of your levels, you may simply:
+
+```{r}
+levels(dataset$GROUP_FACTOR)
+```
+
+Here we see that "Counting" is first and will therefore be entered first into the model.
+
+Assuming that we wanted to reorder the sequence, say to have `Intentional` as the control, then we might simply use `fct_relevel()`:
+
+```{r re-levling}
+dataset <- dataset %>% 
+  mutate(GROUP_FACTOR = fct_relevel(GROUP_FACTOR, "Intentional"))
+                              
+levels(dataset$GROUP_FACTOR)
+```
+
+Note that with `fct_relevel()` whatever level(s) I list get moved to the front of the line. In this case I just bumped `Intentional` up while keeping the remaining levels ordered the same.
+
+However, I liked the original order, so let's change it back:
+
+```{r}
+dataset <- dataset %>% 
+  mutate(GROUP_FACTOR = fct_relevel(GROUP_FACTOR, 
+                                    "Counting", 
+                                    "Rhyming", 
+                                    "Adjective", 
+                                    "Imagery", 
+                                    "Intentional"))
+
+levels(dataset$GROUP_FACTOR)
+```
+
+That's better. Why the order is important will be made clear later in this write up. For now, think back to our example in class of running a t-test using `lm()`. You may recall that the group level that was first entered into the model served as the **model intercept** where the second group level was expressed in terms of the slope of the line (beta). A similar output will be happening here.
+
+So the data structure looks good.
+
+One last little bit of ninja-ing. If you wanted to save a particular `R` object to be used later on you can use the `write_rds()` function (from `tidyverse`). I'm going to save `dataset` as I've cleaned it up so that I can use it in the next walkthrough.
+
+```{r}
+write_rds(dataset,'clean_dataset.rds')
+```
+
+Onward to the analysis!!!!
+
+## Assumptions for ANOVA
+
+### Checking the normality assumption, OPTION 1 raw data by group
+
+To check the distribution of outcomes in ANOVA, you have two options. The first would be to check the distribution of outcomes for EACH group/condition independently. In the case of the example `dataset` we could get info related to the skew and kurtosis of RECALL for each GROUP_FACTOR using `describeBy()`:
+
+```{r}
+psych::describeBy(dataset,group = "GROUP_FACTOR")
+```
+
+If we wanted to perform for extensive methods like `hist()`, `qqPlot()`, and `shapiro.test()`, in the past I had you filter be each level (group) and proceed. So for example for `Counting`:
+
+```{r}
+countingGroup <- filter(dataset,GROUP_FACTOR=="Counting")
+
+hist(countingGroup$RECALL)
+qqPlot(countingGroup$RECALL)
+shapiro.test(countingGroup$RECALL)
+```
+
+In the past you would have to repeat this for each other level. An alternative to generate an output by each level of a factor is to use the `by()` function. For example to generate a sequence of `qqPlot`s (for the sake of space I'm not going to execute this code here, but try on your computer)
+
+```{r eval=FALSE}
+# by(dependent variable, grouping factor, name of function)
+by(dataset$RECALL,INDICES = dataset$GROUP_FACTOR,qqPlot)
+```
+
+You can do the same with `hist()` and `shapiro.test()`
+
+```{r}
+by(dataset$RECALL,INDICES = dataset$GROUP_FACTOR,hist)
+by(dataset$RECALL,INDICES = dataset$GROUP_FACTOR,shapiro.test)
+```
+
+and even our custom standardized skew and kurtosis functions.
+
+### Checking the normality assumption, OPTION 2, the better way: Look at the residuals.
+
+Although `by()` may or may not make life easier for you in this test case, things rapidly become more complicated when attempting to check normality by condition. For example if you're running a 2×3×3 mixed effect ANOVA, you would need to run through 18 conditions!!! So what to do?!?!?!
+
+A simpler alternative is to run you model and analyze your residuals. [This web link](https://www.theanalysisfactor.com/checking-normality-anova-model/) does a nice and quick job of explaining the logic.
+
+In this case we would run our ANOVA model using `lm` (see told you its all the same)
+
+```{r}
+dataset_aov <- lm(RECALL~GROUP_FACTOR, data=dataset)
+```
+
+Congrats, you've just run an ANOVA, but for now we aren't interested in the results from the model. Remember from a few weeks back that many outputs have `attributes` that may be accessed. In this case, we want the models residuals. These can be accessed by
+
+```{r}
+resid(dataset_aov)
+```
+
+From here, we can simply take the residuals (as we did with regression) and submit them to our standard tests for normality. For example, testing skew, and kurtosis:
+
+```{r}
+resid(dataset_aov) %>% skew()
+resid(dataset_aov) %>% kurtosi()
+```
+
+or submit the entire model diagnostic plots:
+
+```{r}
+pacman::p_load(performance)
+
+performance::check_model(dataset_aov)
+```
+
+**So, between OPTION 1 and OPTION 2, I'd recommend typically going with OPTION 2. Especially as your ANOVA designs become more complex.**
+
+#### WALKTHROUGH PROBLEM: Run the requisite tests for normality using the `residuals` from `dataset_aov`
+
+### Homogeneity of Variance
+
+Another assumption of ANOVA is the homogeneity of variance between groups. An easy-way to get an eyeball test of this assumption is two perform a box plot of the data. Here I am performing this plot using `ggplot2`:
+
+```{r}
+ggplot(data =dataset, aes(x=GROUP_FACTOR,y=RECALL)) +
+  geom_boxplot()
+```
+
+Huge differences in the IQR regions may be a clue that the homogeneity assumption is violated. We can run more specific tests in `R` including the Levene Test and Fligner-Killeen Test of Homogeneity of Variances. You are familiar with the Levene Test from a few weeks ago. The Figner-Killeen Test is offered as an alternative if you are concerned with violations of the normality assumption.
+
+As is typically the case $p<.05$ indicates a violation of this assumption:
+
+```{r}
+# Levene Test of Homogeneity of Variances
+car::leveneTest(RECALL~GROUP_FACTOR, data=dataset)
+
+# Fligner-Killeen Test of Homogeneity of Variances
+fligner.test(RECALL~GROUP_FACTOR, data=dataset)
+```
+
+### What to do if the assumptions are violated?
+
+If either assumption is violated, one option that you have is to transform you data. We've talked several times in class about the pros and cons of doing this, and there are several resources that provide examples of how this is done. Another option is to use a non-parametric test such as the Kruskal-Wallis Test if the data is not normal, or Welch's ANOVA is the variances are not homogeneous. That said, one of reasons that ANOVA is so popular is that it has been demonstrated to be robust in the face of violated assumptions (as long as the sample sizes are equal). For example, in *Design and Analysis of Experiments* (1999, p. 112) Dean & Voss argue that the maximum group variance may be as high as 3× the minimum group variance without any issue. With this in mind, a question (gray area) before us is *how much* of a violation is there in the data? And if not so much, you may be fine just running an ANOVA regardless.
+
+## Running the ANOVA in R using `aov()` or `lm()`
+
+There are many, many ways to build an ANOVA model in `R`. Throughout the semester we will be highlighting three: `lm()`, `aov()`, and using the `afex` package. This week we will concentrate on `aov()` which is the standard method, as well as the `lm()` method that you have used before, just to reinforce that ANOVA and regression are one in the same. In fact, SPOILER ALERT, `aov()` is just a fancy wrapper for `lm()`, AND FWIW I don't really like using `aov()`. I only mention it here as if you go looking for how to run ANOVA in `R` online, many sites will say use `aov()`.
+
+Like `lm()` from weeks past, `aov()` asks us to enter our dependent and independent variables into the model in the formula format **DV \~ IVs**. In this case, we only have a single IV, `GROUP_FACTOR`. Thus our model is:
+
+```{r}
+aov.model <- aov(RECALL~GROUP_FACTOR,data = dataset)
+```
+
+From here, an `anova()` of the model gives us our ANOVA table. Note that `car::Anova()` accomplished the same thing, though gives us a different format. The added benefit is that if we so choose, we can change how our Sums of Squares are calculated. This isn't important for simple One-way ANOVA, but see the Field text, Jane Superbrain 11.1 for an explanation.
+
+```{r}
+anova(aov.model)
+car::Anova(aov.model, type="3")
+```
+
+Also note that we can get `residuals` from the `aov()` output as well. In fact take a look at the object's `$class`... see I told you, `lm()`!!!
+
+```{r}
+resid(aov.model)
+```
+
+Even better, a more comprehensive anova table can be obtained by submitting our `aov.model` to `sjstats::anova_stats()`, which gives us our effect sizes as well! This function calculates eta-squared ($\eta^2$), partial-eta-squared ($\eta_p^2$), omega squared ($\omega^2$) and partial omega-squared ($\omega_p^2$) as well as Cohen's *f*. Typically for One-Way ANOVA psychologists report eta-squared ($\eta^2$), though there are arguments that omega squared ($\omega^2$) may be the more preferred measure. Note that pander is for web formatting this page.
+
+```{r}
+pacman::p_load(pander)
+pacman::p_load(sjstats)
+sjstats::anova_stats(aov.model) %>% pander()
+```
+
+## Plotting your data
+
+For publication quality ANOVA plots, there are typically three acceptable plots used to convey your results, box plots, bar plots, and line plots. As the ANOVA become more complex, we tend towards using line plots (box plots and bar plots may become very busy in complex designs). Unless there are other compelling reasons we tend to plot the means (although note that box plots usually give you medians). Since you have already produced box plots and barplots, I'll show examples of how to do a line plot.
+
+To create a **line plot** with points at the means and error lines representing the 95% CI (known as a point range), we can use call that you are familiar with and a new geom `pointrange`. Whats nice about point range is that it allows you to create your points and the error bars all in a single line.
+
+```{r}
+ggplot2::ggplot(data =dataset,mapping = aes(x = GROUP_FACTOR, y = RECALL)) +
+  stat_summary(fun.data = mean_cl_normal, 
+               size=1, 
+               color="black", 
+               geom="pointrange")
+```
+
+Now to add the lines to this plot. For this you will need another `stat_summary()` line specifying that the vertices of the lines should be the means, `fun = mean` and a parameter that specifies how the lines should be grouped. Since we have a One-way ANOVA, `group=1`. When we built to more complex designs you may elect to `group=FACTOR_NAME`. Something like this is useful to say make some lines dashed and some lines solid according to levels on a factor. More on this in two weeks when we get to factorial ANOVA.
+
+While we're at it let's fix those axes titles. We can use the functions `xlab()` and `ylab()` to do so.
+
+```{r}
+# this is from before, saving as object "p"
+p <- ggplot2::ggplot(data =dataset,mapping = aes(x = GROUP_FACTOR, y = RECALL)) +
+  stat_summary(fun.data = mean_cl_normal, 
+               size=1, 
+               color="black", 
+               geom="pointrange") +
+  # adding lines
+  stat_summary(fun = mean, 
+               size = 1, 
+               color = "black", 
+               mapping=aes(group=1), 
+               geom="line") +
+  # and fixing the axis titles:
+  xlab("Group")+ylab("Words recalled")
+show(p)
+```
+
+Finally, for aesthetic reasons you may elect to expand the y-axis. For example to make the range of y-axis values (0,20):
+
+```{r}
+p + expand_limits(y=c(0,20))
+```
+
+That being said, this data probably lends itself to a bar plot. This is similar to how you built your bar plots from as when doing a t-test. As a matter of fact:
+
+#### WALKTHROUGH PROBLEM: Create a bar plot with error bars for our `dataset`.
+
+## Reporting your data / the write up
+
+There are two components to reporting your omnibus ANOVA. First, You need to report your output as related to the test:
+
+-   **the F value**,
+-   **the degrees of freedom (between and within)**,
+-   **the p-value**
+-   **effect size**: typically with between-effects ANOVA we report eta squared, although note that Howell advocates for omega squared. Recall that submitting the model to `sjstats::anova_stats()` gives you both.
+
+Second, as we typically focus on means with ANOVA, it is typically a good idea to report means and some report of of the distribution of each group (typically either standard deviation or standard error; although 95% CI may be useful in certain scenarios).
+
+So for example reporting the `Rhyming` group:
+
+-   **M ± SD:** 6.90 ± 2.13
+-   **M ± SE:** 6.90 ± 0.67
+
+## What the omnibus ANOVA tells you
+
+While it may be useful to report the means, you need to be mindful of what the omnibus ANOVA tells you. Remember, that the the null hypothesis of the omnibus ANOVA is that "there are no differences between observed means". Our significant result tells us that there *are* differences between our means, **but does not tell us what those specific differences are**. So while it may be useful to report general relationships, e.g., "Recall for people in the Intentional group tended to be greater than for the Counting group" you **cannot** say definitively "Recall was significantly greater for the Intentional Group". Typically when you only have tested the omnibus ANOVA, you only speak in generalities (e.g., "Recall tended to increase with level of processing.")
+
+**Always be mindful that you don't over interpret your data.**
+
+## Running an ANOVA using `lm()` (it's a regression afterall)
+
+Now that we've got practical matters out of the way, I want to take some time to dig a little deeper into the connections between ANOVA this week and our work on correlations and regressions in the past.
+
+As we've already mentioned (and spent time discussing in class) ANOVA is just an extension of the simple linear model that we covered last week, where ANOVA is used when our predictors are discrete. In fact `aov()` is simply a wrapper for the `lm()` function that we used last week. For example, let's run our model using `lm()` and then pipe it into `anova()` or `sjstats::anova_stats()`.
+
+```{r}
+lm.model <- lm(RECALL~GROUP_FACTOR, data=dataset)
+anova(lm.model)
+sjstats::anova_stats(lm.model) %>% pander()
+```
+
+All `aov()` does is take an `lm` object and produce an ANOVA table from the results. If we were simply to look at the `lm() model` we see that it gives us the info in our ANOVA table at the end of the summary, including the `F-statistic` (9.085), the `degrees of freedom` (4 and 45) and the `p-value` (1.815e-05):
+
+```{r}
+lm(RECALL~GROUP_FACTOR, data=dataset) %>% summary()
+```
+
+Taking a look at this output, we see that the `lm() model` also gives us a lot of other additional useful info. For example the $R^2$ of the model may be understood as the effect size of the ANOVA. However, when we report it for One-Way ANOVA we express it as... dun, dun, dunnnn... *eta-squared*!!, or $\eta^2$.
+
+One more time with feeling, **for simple oneway ANOVA,** $R^2$ **and** $\eta^2$ **are the same damn thing!!**
+
+Zooming in on the coefficients:
+
+```{r echo=FALSE}
+lm.summary <- lm(RECALL~GROUP_FACTOR, data=dataset) %>% summary() # save above to object
+lm.summary$coefficients
+```
+
+We see information about the means of each group relative to the `(Intercept)`. *This is why I stressed earlier that it may be useful to rearrange the order of your levels such that `R` enters your control group into the model first*. In this case, the first predictor entered is assigned to the `(Intercept)`. The remaining predictors in the model are then presented relative to the first. Since we entered "Counting" first, the estimate of the `(Intercept)` represents its mean. The means for each remaining group are the sum of its estimate coefficient and the `(Intercept)`. So for example the mean of the Rhyming group is $(-0.1)+(7.0)=6.9$.
+
+The coefficients section also gives us one other useful bit of information, the $t$-values of the estimate. As we learned a few weeks ago, for a simple regression the beta coefficient gives us information about the slope of the regression line and the corresponding $t$-value is a test of the null $beta=0$. So for a simple regression this tells us if our slope is significantly different from 0.
+
+A similar logic applies to the ANOVA model. As I mentioned above, deriving the means of each level of our IV is a matter of summing the (Intercept) and the beta estimate for that level. It should be apparent, then, that the beta estimates here represent the slope of a line that between the intercept and the mean of the level (where the distance between the predictor and coefficient is treated as a unit 1). Therefore, a significant $t$-value for beta tells us that the slope between the two means is significant, or that those two means are significantly different from one another.
+
+Keep in mind the only comparisons that are being made here are between the individual levels of our IV and the control (Intercept). So while this output allows us to make a claim about the difference between the means of the Counting (Intercept) group compared to each of the other groups, it **does not** allow us to make a claim about differences between our other levels. For example no information about a statistical test of differences between the Rhyming and Imagery groups is conveyed here. However, assuming you are interested in deviations from your control, you can get info here quickly. There is a caveat here, in that our alpha criterion will need to be adjusted to be more conservative than `.05.` More on this next week.
+
+## Reporting your results.
+
+### Reporting just the ANOVA
+
+For this week's assignment, you are going to be asked to simply report the ANOVA. In future weeks you will see that simply reporting the ANOVA is not the end of your analysis, but only the beginning of additional, necessary follow-ups. But that is for next week, for now let's take a look at what one might expect to be reported in an ANOVA write-up.
+
+Given our example:
+
+-   words RECALL is our dependent measure
+-   GROUP_FACTOR is our independent variable, with five levels (or groups).
+
+Using sjstats to generate an ANOVA table (pander makes it pretty for this web page:
+
+```{r}
+sjstats::anova_stats(aov.model) %>% pander()
+```
+
+From this table, we need our:
+
+-   **df**: 4 and 45
+-   **F-statistic**: 9.085
+-   **p.value**: even though it says zero, its "\<.001"
+-   **etasq**: .447; the symbol for etasq is $\eta^2$
+
+Taking all of this info, and plugging into a write-up template (inserted points in bold):
+
+"We hypothesized that different types of memorization strategies would result in different levels of memorization between our **five groups**, as measured by the **number of words recalled**. To test this hypothesis we conducted a One-way Analysis of Variance. Our analysis revealed a significant effect for **Groups**, *F*(4, 45) = 9.08, *p* \< .001, $\eta^2$ = .45; see Figure 1."
+
+For now, this is all you can say with only running a One-way ANOVA using this method, and that's all I would want for the homework for this week.
+
+### Reporting the ANOVA, lm() output
+
+Let's revisit the `lm()` output. Recall that the `lm()` method gives us the added benefit of comparing each level of the `GROUP_FACTOR` to the control level. This is what's known as treatment contrasts (see Winter, Chapter 7). In this case, our control level is `Counting` and every other level (group) is compared against `Counting` and captured in the resulting beta coefficients:
+
+```{r}
+aov_model_lm <- lm(RECALL~GROUP_FACTOR, data = dataset)
+summary(aov_model_lm)
+```
+
+From this summary output we would not only extract our `F-statistic`, `df`, `p-value` and `R-squared` (remember that $R^2$ is $\eta^2$) as we do for the previous write-up, but now we can talk about differences between the other levels and `Counting` as expressed as a `t` value (we are running t-tests). We then combine this info with info related to the means and standard errors (note that I got the means and ses by creating a summary `tibble():`
+
+```{r}
+dataset %>% 
+  group_by(GROUP_FACTOR) %>%
+  summarise(mean = mean(RECALL) %>% round(2),
+            se = sd(RECALL)/sqrt(n()) # ses = sd / sqrt number of participants
+            ) %>% 
+  # this bit of code does some rounding (optional)
+  mutate_if(is.numeric,
+            round,
+            digits = 2)
+  
+
+```
+
+Putting all of this info together, we might say:
+
+> "We hypothesized that different types of memorization strategies would result in different levels of memorization between our **five groups**, as measured by the **number of words recalled**. To test this hypothesis we conducted a One-way Analysis of Variance. Our analysis revealed a significant effect for **Groups**, *F*(4, 45) = 9.08, *p* \< .001, $\eta^2$ = .45. As can be seen in Figure 1, we found that the average number of words recalled for the Adjective ($M$ = 11.0, SE = 0.79; $t$(45) = 2.88), Imagery ($M$ = 13.4, SE = 1.42; $t$(45) = 4.60), and Intentional ($M$ = 12.0, SE = 1.18; $t$(45) = 3.60) memorization groups were all greater than the Counting group ($M$ = 7.0, SE = 0.58); *ps* \< .01".
+
+-   note that I find it acceptable to lump the p-values together in this manner when doing multiple comparisons, as we are doing here.
+
+In both cases BE SURE TO PRODUCE A CAMERA READY FIGURE and REFER TO IT IN THE TEXT!!!
