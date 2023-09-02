@@ -6,3 +6,8 @@
 
 /.luarc.json
 .Rproj.user
+
+*.Rproj
+.RData
+.Rhistory
+.Ruserdata
