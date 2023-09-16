@@ -9,13 +9,16 @@ This write-up requires the following packages:
 ```{r}
 pacman::p_load(tidyverse, 
                cowplot, 
+               agricolae, 
                Rmisc, 
-               emmeans)
+               psych,
+               emmeans,
+               pander)
 ```
 
-# Example 1: a 2×2 ANOVA
+## Example 1: a 2×2 ANOVA
 
-To start let's look at the first example from last week's walkthrough. To remind ourselves of the particulars, our example ANOVA comes from a study testing the effects of smoking on performance in different types of *putatively* (perhaps I'm showing my theoretical biases here) information processing tasks.
+To start let's look at the first example from our previous walkthrough. To remind ourselves of the particulars, our example ANOVA comes from a study testing the effects of smoking on performance in different types of *putatively* (perhaps I'm showing my theoretical biases here) information processing tasks.
 
 There were 3 types of cognitive tasks:
 
@@ -60,7 +63,7 @@ ez::ezDesign(data = dataset_2by2,
              col = NULL) # or column
 ```
 
-## Interaction plots
+### Interaction plots
 
 Interaction plots take into consideration the influence of each of the IVs on one another---in this case the mean and CI of each smoking group (Active v. Nonsmoking) as a function of Task (Driving Simulation v. Pattern Recognition). For example, a line plot might look like this:
 
@@ -79,88 +82,46 @@ ggplot(data = dataset_2by2, mapping=aes(x=Smkgrp,
   theme_cowplot()
 ```
 
-## Running the ANOVA `lm()` method
+### ANOVA model
 
-Now we can run the ANOVA using the `lm()` method. The new wrinkle from last week is that we are adding our interaction terms the formula equation the structural equation:
-
-$$y=IV_1+IV_2+(IV_1*IV_2)$$ where the first and second terms capture our main effects and the third is our interaction.
-
-Last week you only focused on the main effects so our model is what we would call **additive**:
-
-```{r eval=FALSE}
-lm(score~Smkgrp+Task,data = dataset_2by2)
-```
-
-This week we are including the interaction term. In `R` this formula now becomes:
-
-```{r eval=FALSE}
-lm(score~Smkgrp + Task + Smkgrp*Task,data = dataset_2by2)
-```
-
-The operator `*` may be understood here as "crossed-by" or "interaction between". Depending on your reference, you may also see `:` which means the same thing.
-
-Note that we can write this same equation in shorthand:
-
-```{r eval=FALSE}
-lm(score~Smkgrp*Task,data = dataset_2by2)
-```
-
-where the `*` operator tells `R` to examine **all** related main effects and interactions. This is usually the best way to code this, as the long-form becomes unwieldy as we increase IVs and combinations of interactions. ***However, note that if you have planned comparisons you may elect to only specify certain main effects and interactions in long-form. This may become increasing important when you start to deal with more complex models. I think I'll do a brief write up about this one day (before the end of the semester) by for now...***
-
-Before continuing, let's compare the outputs of the **additive model** and the **interaction** **model:**
+As before we can build our ANOVA model and test it against the requisite assumptions
 
 ```{r}
-lm(score~Smkgrp + Task,data = dataset_2by2) %>% anova()
-```
-
-```{r}
-lm(score~Smkgrp * Task,data = dataset_2by2) %>% anova()
-```
-
-Notice that adding the interaction terms does not affect our analysis of the main effects, both models have identical Mean Square and F values for the main effects. This is what we mean when we say that the tests within ANOVA are orthogonal to one another (independent of one another).
-
-Another thing to note here are that the apparent equal F-values in our **Task** effect and **Interaction** is due to rounding. This is simply an anomaly, and is not to be expected in most cases. Even here, they are different, but only nearly identical. **As a thought experiment, can we think of why they are nearly identical in this case (Hint: can you see in the plot what might be causing the interaction)?**
-
-### Checking assumptions
-
-Okay let's save our model and proceed to do the requisite assumptions checks:
-
-```{r echo=FALSE}
 aov_model <- lm(score~Smkgrp*Task,data = dataset_2by2)
-```
 
-```{r}
-aov_model %>% performance::check_model(panel=F)
-```
-
-```{r}
-aov_model %>% performance::check_normality() # shapiro test from performance
+aov_model$residuals %>% car::qqPlot()
 aov_model %>% car::leveneTest()
 ```
 
 As in the last walkthrough we'll ignore the issues with homogeneity. Let's run our ANOVA:
 
 ```{r}
-sjstats::anova_stats(aov_model)[1:8]
+aov_model %>% sjstats::anova_stats()
 ```
 
-## Adressing the interaction
+### Adressing the interaction
 
 This model yields a Smoking group by task interaction! Looking at our interaction plot above, we shouldn't have been too surprised by this. We see that for Non smokers, there is minimal difference between the two cognitive tasks, whereas with the smoking group, the scores of the Driving Simulation group were much lower than the Pattern recognition group. Another, equally valid way of interpreting the data is that while Pattern recognition scores were unaffected by smoking condition, Driving simulation scores were drastically decreased for smokers compared to non-smokers. While both interpretations are equally valid in the neutral sense, one may be more interesting to you the researcher (this is where your a priori hypotheses would come into play). Is it more interesting that Non smokers performed equivalently on both types of cognitive tasks while active smokes performed better on the pattern recognition task than the driving task **OR** is it more interesting that Pattern recognition scores where unaffected by smoking whereas driving simulation scores were?
 
 I bring this up, as while it may be appropriate to mention both trends, you typically only TEST for one or the other. Remember, there is a cost for every test that your run---you need to adjust for familywise error.
 
-In this case I'm going test the second variant, testing how performance on each cognitive task changes by virtue of smoking group. To run a post-hoc ANOVA. This can be accomplished sending our model to `joint_tests()`. So the model is saying take a look at how smoking group scores change **on each level of task**.
+In this case I'm going test the second variant, testing how performance on each cognitive task changes by virtue of smoking group. To run a post-hoc ANOVA. This can be accomplished sending our model to `emmeans()`. Below, the `|` operator can be understood as "nested within". So the model is saying take a look at how smoking group scores change **on each level of task**.
 
 ```{r}
-aov_model %>% emmeans::joint_tests(by = "Task")
+aov_model %>% emmeans(spec=~Smkgrp|Task)
 ```
 
-Since smoking group only has 2 groups, I could stop here and report my obtained $F$ tests. If you prefer to report the pairwise $t$ test you can simply specify your pairwise comparisons for `Smkgrp`, `by` each level of `Task` using `emmeans()`.
+FWIW, if it helps, the following is equivalent:
+
+```{r}
+aov_model %>% emmeans(spec= "Smkgrp", by = "Task")
+```
+
+In either case, Smoking Group only has 2-levels I can send this to a pairwise test:
 
 ```{r}
 aov_model %>% 
-  emmeans::emmeans(spec = "Smkgrp", by = "Task") %>%
+  emmeans(spec= "Smkgrp", by = "Task") %>%
   pairs(adjust="tukey")
 ```
 
@@ -174,11 +135,11 @@ Things become slightly more complex when on of our factors has 3 or more levels.
 
 Here's the data, where Score represents performance:
 
-```{r}
+```{r echo=FALSE}
 dataset <- read_csv("http://tehrandav.is/courses/statistics/practice_datasets/factorial_AOV_data.csv")
 ```
 
-## Plotting the data and descriptive stats
+### Plotting the data and descriptive stats
 
 Here's what our results look like. I'll revisit the particulars on constructing this sort of plot in the next walkthrough. For now, all we are doing is extending the plotting methods that you have been using for the past few weeks. The important addition here is the addition of `group =` in the first line the `ggplot`.
 
@@ -225,21 +186,25 @@ summarySE(data = dataset,measurevar = "Score", groupvars = "Presentation")
 
 ```
 
-## the Omnibus ANOVA (and assumption tests)
+### the Omnibus ANOVA (and assumption tests)
 
 The very first ANOVA model that we build crosses all of our independent variables. This is the **omnibus ANOVA**. Let's build this model and run our assumption checks
 
 ```{r}
 omnibus_aov <- lm(Score~Lecture*Presentation, dataset)
+
+# check the normality assumption of the residuals:
+omnibus_aov$residuals %>% car::qqPlot()
+omnibus_aov %>% car::leveneTest()
 ```
 
-I'm going to skip the assumption checks (bad professor!) and go straight to our results:
+Good to go, let's check our results:
 
 ```{r}
 sjstats::anova_stats(omnibus_aov)[1:8]
 ```
 
-**Looking at the ANOVA**: Our ANOVA reveals two main effects and in interaction. Looking back at the plot (always, always plot before you think about doing any sort of follow-ups!!) it is fairly apparent what is happening---when moving from one lecture to the next, we see a much more dramatic decrease in score for the Social group in the **Standard** presentation group compared to the **Computer** presentation. That is, moving from left to right the pattern of change is different for the **Standard** group, compared to the **Computer** group. This is what our eyeball test is telling us---we need to confirm it with some stats! There are two ways to address this interaction, each involves sub-setting the data for further analysis.
+**Looking at the ANOVA**: Our assumptions tests check out, and our ANOVA reveals two main effects and in interaction. Looking back at the plot (always, always plot before you think about doing any sort of follow-ups!!) it is fairly apparent what is happening---when moving from one lecture to the next, we see a much more dramatic decrease in score for the Social group in the **Standard** presentation group compared to the **Computer** presentation. That is, moving from left to right the pattern of change is different for the **Standard** group, compared to the **Computer** group. This is what our eyeball test is telling us---we need to confirm it with some stats! There are two ways to address this interaction, each involves sub-setting the data for further analysis.
 
 As mentioned above, when you have an interaction, you proceed by testing for differences between means for one condition, on **each individual level of the other**. For example, we can test for and effect of Lecture Type when the Presentation is Computer, and effect of Lecture Type when the Presentation is Standard. In this case you would run two separate simple effects ANOVAs, each taking a look at changes for each line in the plot above.
 
@@ -253,17 +218,17 @@ Which you choose, ultimately depends on which narrative you are trying to convey
 
 Given that we have elected to take a look at Lecture on each level of Presentation, we would need to run 2 **simple effects ANOVAs**. This is because breaking the omnibus in this way still leaves in each subsequent analysis a comparison of the 3 levels of Lecture. Basically we are running 2 separate One-way ANOVAs:
 
-1.  the first looks at Scores\~Lecture when Presentation = Computer
+1.  the first looks at Scores\~Lecture when Presentation = Computer and
 2.  the second looks at Scores\~Lecture when Presentation = Standard
 
-There is, however, one major caveat. When you run the follow-up ANOVA **you need to use the error terms from your omnibus ANOVA**. *That is your simple effects ANOVA calls for the omnibus ANOVA errors: Sum of Squares, Mean Square Error, and denominator degrees of freedom.*
+There is, however, one major caveat. When you run the follow-up ANOVA **you need to use the error terms from your omnibus ANOVA**. That is your simple effects ANOVA calls for the omnibus ANOVA errors: Sum of Squares, Mean Square Error, and denominator degrees of freedom.
 
 **What this means is that if you were to actually run this data as two distinct One-Way ANOVAs, the F-value (and subsequent p-values) that you get would be WRONG. For example simply running a `filter` and then ANOVA like this will not work:**
 
 ```{r}
 # this is wrong... don't do this!!!
 lm(Score~Lecture, dataset %>% filter(Presentation=="Computer")) %>%
-  sjstats::anova_stats() %>% dplyr::select(1:8)
+  sjstats::anova_stats() %>% dplyr::select(1:8) %>% pander
 ```
 
 A quick glance at the table above reveals the error. You'll notice that the denominator df are 15 where in the omnibus ANOVA they were 30. Fixing this isn't as simple as adjusting the denominator df and looking it up on the F-table. This involves a series of calculations that results in a different F-ratio as well. For the sake of clarity I'm going to show you how to do this "by hand" and then show you how you'll never need to do it "by hand"
@@ -355,14 +320,18 @@ tibble(corrected_f, corrected_p, corrected_pes)
 
 ### the simple effects ANOVA
 
-In years past, I would have shown you how to create your own function to do this, but instead we can also use the **emmeans** package to conduct simple effects follow-ups. In class I introduced you to the function **`joint_test()`** which can be used to conduct a simple effects ANOVA. [NOTE: I show you an alternative method using `emmeans::emeans()` at the end of this walkthough. Both are equivalent].
-
-In this case we need to tell `joint_test` how to parse our `omnibus_aov` model. Here we are telling it to look at the effects of `Lecture` by each level of `Presentation`.
+In years past, I would have shown you how to create your own function to do this, but instead we can also use `emmeans()` to conduct simple effects follow-ups. In this case we need to tell `emmeans()` how to parse our `omnibus.aov` model. Here we are telling it to look at the effects of `Lecture` on each level of `Presentation`.
 
 ```{r}
-simple_effects_by_presentation <- joint_tests(omnibus_aov, by = "Presentation")
+simple_effects_by_presentation <- emmeans(omnibus_aov, ~Lecture|Presentation)
+```
 
-simple_effects_by_presentation
+We can then pipe our simple effects `emmeans` into this call to run BOTH simple effects ANOVA
+
+```{r}
+simple_effects_by_presentation %>% 
+  pairs() %>% 
+  test(joint=T)
 ```
 
 Based on this output we have a simple effect for standard but not computer.
@@ -378,22 +347,18 @@ F_to_eta2(f = 15.36, df = 2, df_error = 30)
 
 ### post-hoc analyses on the simple effects ANOVA
 
-Given that we have a simple effect for standard, we need to run pairwise posthoc analyses to test the effect of Lecture on each presentation thype. However, given that our test suggested no simple effect on Computer, we can just ignore that part of the output.
-
-We can do so using `emmeans()` and specifying that we want to break our pairwise comparisons up `by` Presentation.
+Given that we have a simple effect for standard, we need to run pairwise posthoc analyses. Given that our `joint` test suggested no simple effect on Computer, we can just ignore that part of the output.
 
 ```{r}
-pairwise_comps <- emmeans::emmeans(omnibus_aov, by = "Presentation", specs = pairwise~Lecture)
-
-pairwise_comps %>% pairs()
+simple_effects_by_presentation %>% pairs()
 ```
 
 Given our latter result above we see that in the Standard presentation, scores based on Social lectures were significantly less than the other two.
 
-If we wanted to calculate any effect sizes for the pairwise comparisons (corrected Cohen's D) we could use the function we learned last week. Again, ignore Computer as it was non-significant.
+If we wanted to calculate any effect sizes for the parwise comparisons (corrected Cohen's D) we could use the function we learned last week. Again, ignore Computer as it was non-significant.
 
 ```{r}
-emmeans::eff_size(object = pairwise_comps,
+eff_size(object = simple_effects_by_presentation,
          sigma = sigma(omnibus_aov),
          edf = df.residual(omnibus_aov))
 ```
@@ -416,29 +381,12 @@ From this one might conclude that administering content via E-course is better f
 
 ## Example write-up:
 
-First my camera ready plot:
+> To test for the effects of Presentation style (Standard, Computer) and Lecture Type (Physics, History, Social) we ran a 2 × 3 factorial ANOVA. This ANOVA revealed main effects for both Presentation style, $F(1,30)=39.73, p<.001, \eta_p^2=.57$, and Lecture type, $F(2,30)=10.74, p<.001, \eta_p^2=.42$.
+>
+> As shown in Figure 1, these effects we qualified by a Presentation style × Lecture type interaction, $F(2,30)=6.49, p=.005, \eta_p^2=.30$. Differences in Lecture type were only observed when material was presented in the Standard presentation, $F(2,30)=15.36, p<.001, \eta_p^2=.51$, where scores from the Social lecture were significantly different from the remaining two (Tukey HSD, *p*\< .05). No differences were observed when the material was presented via computer (*p*\>.05). Overall, participants performed better when the material was presented via computer (*M±SD*: 41.33 ± 6.25) compared to standard presentations (25.67 ± 13.11).
 
-```{r}
-ggplot(dataset,mapping = aes(x = Lecture,y = Score, group=Presentation)) +
-  stat_summary(geom = "pointrange",
-               fun.data = "mean_se",
-               position = position_dodge(.25), # dodge to prevent overlap
-               aes(shape=Presentation)) + # each level of presentation gets a shape
-  stat_summary(geom = "line", fun ="mean", position = position_dodge(.25)) +
-  theme_cowplot() +
-  theme(plot.margin=unit(c(.25,.25,.25,.25),"in"))
-```
+One thing you may notice is that I still stressed the main effect. This is to stress to the reader that presentation type did make a difference.
 
-*Figure 1* Scores as a function of Lecture type and Presentation style. Error bars represent standard error.
+## Performing this in SPSS (video)
 
-To test for the effects of Presentation style (Standard, Computer) and Lecture Type (Physics, History, Social) we ran a 2 × 3 factorial ANOVA. This ANOVA revealed main effects for both Presentation style, $F(1,30)=39.73, p<.001, \eta_p^2=.57$, and Lecture type, $F(2,30)=10.74, p<.001, \eta_p^2=.42$.
-
-As shown in Figure 1, these effects we qualified by a Presentation style × Lecture type interaction, $F(2,30)=6.49, p=.005, \eta_p^2=.30$. Differences in Lecture type were only observed when material was presented in the Standard presentation, $F(2,30)=15.36, p<.001, \eta_p^2=.51$, where scores from the Social lecture were significantly different from the remaining two (Tukey HSD, *p*\< .05). No differences were observed when the material was presented via computer (*p*\>.05). Overall, participants performed better when the material was presented via computer (*M±SD*: 41.33 ± 6.25) compared to standard presentations (25.67 ± 13.11).
-
-***(One thing you may notice is that I still stressed the main effect. This is to stress to the reader that presentation type did make a difference overall.)***
-
-
-One to the next one!!!
-
-
-
+As I mentioned in class, given that we are doing our analyses via programming, we have the luxury of have a function in `emmeans()`that can make all of our simple effects adjustments for us. If you are using the GUI method in SPSS, you don't have this luxury (although you can certainly create a similar function in SPSS!). Fear not, here I walk you through how to do this in SPSS, assuming you have Microsoft Excel. Check out this vid on youtube: <https://youtu.be/0Y-dVv-UCz4>.

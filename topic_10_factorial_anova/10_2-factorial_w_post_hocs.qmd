@@ -1,0 +1,304 @@
+---
+title: 'Factorial ANOVA - Post hoc analysis of Main effects'
+---
+
+In the last walkthrough, analyzed a 2×2 ANOVA focusing on our main effects. Because each of our factors only had two levels, there was no need to follow up on significant main effects with pairwise post hoc analysis. In this walkthough we will take a look at examples where our main effects have 3 or more levels, and demand a post-hoc analysis. For now, let's try another example. First let's bring in the necessary packages:
+
+```{r}
+pacman::p_load(psych, tidyverse, cowplot, emmeans, ez)
+```
+
+## Example: A 2 × 3 ANOVA
+
+Thirty-six college students were randomly assigned to 3 groups (N=12). Students in each group were asked to watch and take notes on a 50 min lecture. One week later all students were tested on the content of their lectures, and their `scores` were compared. Groups differed by the lecture's subject matter, where:
+
+-   **1** = Physics lecture
+-   **2** = Social Science lecture
+-   **3** = History lecture
+
+The lectures were presented in two manners
+
+-   **1 =** via computer
+
+-   **2** = standard method, lecturer in a lecture hall
+
+The researchers hypothesized that students that learned the material in the standard lecture would perform better than those that learned via computer.
+
+```{r}
+dataset_no_inter <- read_csv("http://tehrandav.is/courses/statistics/practice_datasets/factorial_ANOVA_dataset_no_interactions.csv")
+
+dataset_no_inter$Lecture <- recode_factor(dataset_no_inter$Lecture, "1"="Phys","2"="Soc","3"="Hist")
+
+dataset_no_inter$Presentation <- recode_factor(dataset_no_inter$Presentation, "1"="Comp","2"="Stand")
+
+summary(dataset_no_inter)
+```
+
+### Building the ANOVA model
+
+I'm going to use `lm()`.
+
+```{r}
+aov_model <- lm(Score~Presentation + Lecture, data = dataset_no_inter)
+```
+
+### Testing assumptions
+
+### visual
+
+```{r}
+aov_model %>% performance::check_model(panel=FALSE)
+```
+
+```{r}
+aov_model %>% performance::check_normality()
+aov_model %>% performance::check_homogeneity()
+```
+
+The model checks both for normality of residuals but fails homogeneity of variance. Following upon given the robustness of ANOVA (3x rule):
+
+```{r}
+dataset_no_inter %>% 
+  group_by(Lecture, Presentation) %>%
+  summarise(mean = mean(Score),
+            var = var(Score))
+```
+
+Potential issues, but moving on.
+
+### Interaction plot
+
+Let's plot the data. You'll note in this plot I'm adding some code to get it into better APA shape. More on this in the next walkthrough. For now just focus on content.
+
+```{r}
+# setting original parameters
+p <- ggplot2::ggplot(data = dataset_no_inter, mapping=aes(x=Lecture,y=Score,group=Presentation))
+
+# making a basic line plot
+line_p <- p + stat_summary(geom="pointrange",fun.data = "mean_se", size=0.75, position=position_dodge(.25), aes(shape=Presentation)) + 
+  stat_summary(geom = "line", fun = "mean", position=position_dodge(.25), aes(linetype=Presentation))
+
+# adding APA elements
+line_p <- line_p + theme(
+    axis.title = element_text(size = 16, face = "bold", lineheight = .55),
+    axis.text = element_text(size = 12),
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.position = c(.75,.9)) +
+  xlab("Lecture type") + 
+  ylab ("Performance score") +
+  theme(plot.margin=unit(c(.25,.25,.25,.25),"in")) + 
+  theme_cowplot()
+
+show(line_p)
+```
+
+### Testing the ANOVA
+
+```{r}
+aov_model %>% sjstats::anova_stats() %>% 
+  select("term","df","statistic","p.value","partial.etasq")
+```
+
+## post hoc analysis
+
+Admittedly, moving on to this step will ultimately be qualified by the presence of interactions (next week). For now, note that if you don't have an interaction, you may simply proceed to run post-hoc analyses on any significant main effects in the manner you would with a One-way ANOVA. Easy, peasy, right. One thing to note, you need to make the appropriate multiple comparison corrections. For example, returning to our data with no interaction, we need to test for differences in both the `Lecture` and `Presentation` main effects.
+
+-   Presentation: This one is easy. We only have two levels of `Presentation`, so the omnibus $F$ test tells us that our two groups are different. Nothing else to do here other than note which mean (Computer v. Standard) is greater than the other.
+
+-   Lecture: We have three levels of lecture, so were are going to need to run a post-hoc analysis. In this case, we may call upon our old standbys, Tukey and Bonferroni.
+
+**Just as last week, we can use `emmeans()` to run our post-hoc tests.**
+
+For example, to run a Tukey, you need call your ANOVA model. For the sake of clarity let's rebuild the ANOVA model and save it to `aov_model` and then run `emmeans()`
+
+Here I'm saving it to the object `aov_model`:
+
+```{r}
+aov_model <- lm(Score~Presentation + Lecture, data = dataset_no_inter)
+```
+
+From here you may call upon the `emmeans()` function to derive your posthocs. By itself, `emmeans` produces the means by levels of the IV(s) listed in its `spec=` argument. It takes the `lm()` model as a first argument, and the IVs of interest as the second.
+
+```{r}
+# input your model into the emmeans,
+# interested in Lecture
+
+emmeans(aov_model,specs = ~Lecture)
+```
+
+`emmeans()` alone gives us the estimated marginal means for each of our levels, to run a post-hoc comparison we then pipe it into `pairs()` and include the `p value` adjustment that we would like to make. allows another method for making contrasts (planned and posthoc). If you want to perform a Tukey test follow this procedure you can simply pipe the previous (or save to an object and submit) to `pairs()`:
+
+```{r}
+emmeans(aov_model,specs = ~Lecture) %>% pairs(adjust="tukey") 
+```
+
+In this case it appears that our Tukey does reveal differences between means, when performance of those getting Physical Science Lectures is greater than both History and Social, but Social and History are not difference from one another.
+
+Note that you may call other p-value adjustments using these methods:
+
+```{r}
+emmeans(aov_model,specs = ~Lecture) %>% pairs(adjust="bonferroni")
+```
+
+## What about planned contrasts?
+
+You need to be careful when running planned contrasts in factorial ANOVA. In general I would recommend only running planned contrasts on a single main effect, or a planned contrast on the effects of one of your factors at a single level of your other (though you still need to proceed with caution here).
+
+For example, using the data from the last section, I would only run a planned contrast related to the main effect of `Lecture Type`, or a contrast of `Lecture Type` means only in `Computer presentation` conditions (or `Standard presentation`). DO NOT, I repeat DO NOT run contrasts that go across levels of your other factors. Well, truthfully, you can do whatever you want, but you may find that your ability to meaningfully interpret your results in such cases is extremely limited.
+
+We can run planned contrasts using `emmeans()` as well. In this case, we need to specify the contrasts.
+
+First we need to obtain the `emmeans()` of the model including all cells (all factors). Using `aov.model` from the previous example:
+
+```{r}
+emmeans(aov_model, specs = ~Lecture+Presentation)
+```
+
+OK. From here let's build two custom contrasts. First, let's do the `Lecture` contrast on the main effect. In this case let's assume I want to contrast `Phys` with the combined other two conditions. Using the output above, I identify which rows contain `Phys` and I ensure that the summation of those rows is 1. In this case there are two rows, the first and the fourth, and each gets `0.5`. My remaining conditions must also equal `-1`. In this case there are four, so each is `-0.25`. Following the output above, then my contrast matrix is:
+
+```{r}
+lecture_contrast <- list( "Phys v. Soc + Hist" = c(.5,-.25,-.25,.5,-.25,-.25))
+```
+
+From here I simply call `contrast()` with my contrast matrix as an argument. So the entire pipe goes from:
+
+```{r}
+emmeans(aov_model, specs = ~Lecture + Presentation) %>% contrast(lecture_contrast)
+```
+
+Assuming I wanted to perform a set of orthogonal contrasts:
+
+-   Phys v. Soc and Hist and
+
+-   Soc v Hist
+
+```{r}
+# build the contrast matrix
+contrast_matrix <- list("Phys v. Soc + Hist" = c(.5,-.25,-.25,.5,-.25,-.25),
+                        "Soc v Hist" = c(0, -.5, .5, 0, -.5, .5)
+                        )
+
+# run the contrasts
+emmeans(aov_model, specs = ~Lecture + Presentation) %>% contrast(contrast_matrix)
+```
+
+In both cases, my p-values are unadjusted. I can add an adjustment to the `contrast()` argument like so:
+
+```{r}
+# tukey is most common
+emmeans(aov_model, specs = ~Lecture + Presentation) %>% contrast(contrast_matrix, adjust = "tukey")
+
+# or bonferroni is most conservative
+emmeans(aov_model, specs = ~Lecture + Presentation) %>% contrast(contrast_matrix, adjust = "bonferroni")
+
+# or holm is more liberal
+emmeans(aov_model, specs = ~Lecture + Presentation) %>% contrast(contrast_matrix, adjust = "holm")
+```
+
+## More examples: a 3 × 3 ANOVA
+
+In the previous example we focused in the 2 × 3 scenario for ease. Let's look at how we might deal with a 3 × 3 example. Let's use our dataset from the previous walkthrough involving a 3 (Smoking group) by 3 (Task) design. Let's run another example using this data. Let's use this as a chance to brush up on creating APA visualizations:
+
+```{r}
+dataset <- read_delim("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Sec13-5.dat", 
+                      "\t", escape_double = FALSE, 
+                      trim_ws = TRUE)
+dataset$PartID <- seq_along(dataset$score)
+dataset$Task <- recode_factor(dataset$Task, 
+                              "1" = "Pattern Recognition", 
+                              "2" = "Cognitive", 
+                              "3" = "Driving Simulation") 
+dataset$Smkgrp <- recode_factor(dataset$Smkgrp, 
+                                "3" = "Nonsmoking", 
+                                "2" = "Delayed", 
+                                "1" = "Active")
+
+dataset
+```
+
+### Interaction plot
+
+```{r}
+# line plot
+ggplot(data = dataset, mapping=aes(x=Smkgrp,y=score,group=Task)) +
+  stat_summary(geom="pointrange",
+               fun.data = "mean_cl_normal", 
+               position=position_dodge(.5)) + 
+  stat_summary(geom = "line", 
+               fun = "mean", 
+               position=position_dodge(.5), 
+               aes(linetype=Task)) +
+  theme_cowplot()
+```
+
+Before continuing it might be useful to get a feel for whats going on in the dataset. In this case, both the performance on the Cognitive and Driving simulation tasks seems to be impacted by the degree of smoking. However the Pattern recognition task does not appear to be affected.
+
+Another way of viewing this is that scores on the Cognitive task tended to be greater than the other two Task conditions. Let's hold onto our impressions of the data and move on.
+
+### ANOVA model
+
+As before we can build our ANOVA model and test it against the requisite assumptions:
+
+```{r}
+aov_model <- lm(score~Smkgrp+Task,data = dataset)
+```
+
+```{r}
+aov_model %>% performance::check_model(panel=F)
+```
+
+```{r}
+aov_model %>% performance::check_normality()
+aov_model %>% performance::check_homogeneity()
+```
+
+As in the last walkthrough we'll ignore the issues with our assumption checks
+
+```{r}
+aov_model %>% sjstats::anova_stats() %>%
+  dplyr::select(c("term","df","statistic","p.value","partial.etasq"))
+```
+
+Here we have significant main effects for `Smkgrp` and `Task`. We'll need to run seperate post-hoc analyses for each of our observed effects (given that both factors have 3 levels). Before moving on, I would recommend writing out the main points of this table to refer to later in your write up.
+
+> -   main effect for Task, $F$ (2, 130) = 125.40, $p$ \< .001, $n_p^2$ = .66.
+>
+> -   main effect for Smoking Group, $F$ (2, 130) = 7.94, $p$ = .001, $n_p^2$ = .11
+
+## Post-hoc analysis
+
+### Task
+
+```{r}
+main_effect_Task <- emmeans(aov_model, ~Task) %>% pairs(adjust="tukey")
+
+main_effect_Task
+```
+
+The results confirm that overall, Cognitive task performance was greater than the other two conditions. To get the descriptive stats for these contrasts, we can use `summarySE`, only specifying `Task` as our grouping viariable:
+
+```{r}
+Rmisc::summarySE(data = dataset, measurevar = "score", groupvars = "Task")
+```
+
+### Smkgrp
+
+```{r}
+main_effect_Smkgrp <- emmeans(aov_model, ~Smkgrp) %>% pairs(adjust="tukey")
+
+main_effect_Smkgrp
+```
+
+and to get these descriptive stats, we run `summarySE` using only `Smkgrp` as our grouping variable:
+
+```{r}
+Rmisc::summarySE(data = dataset, measurevar = "score", groupvars = "Smkgrp")
+```
+
+## Example write up
+
+Let's use this space to provide an example write-up for our factorial ANOVA. To do this I need to refer back to values I generated in my ANOVA table, my post-hoc tests, and my descriptive statistics above.
+
+> To test our hypothesis we ran a 3 (Task) × 3 (Smoking Group) ANOVA on cognitive performance scores. Our ANOVA revealed a significant main effect for Task, $F$ (2, 130) = 125.40, $p$ \< .001, $n_p^2$ = .66. Post hoc analysis of Task revealed that participants scored higher in the Cognitive group ($M±SE$ = 38.78 ± 2.69) than the Pattern Recognition (9.64 ± 0.67 ) and Driving Simulator (6.36 ± 0.84) groups ($ps$ \< .05).
+>
+> Our analysis also revealed a main effect for Smoking Group, $F$ (2, 130) = 7.94, $p$ = .001, $n_p^2$ = .11. Post hoc analysis of Smoking Group revealed participants scored higher in the Nonsmoking group than the Active group ($p$ \< .05). No other statistically significant group differences were observed.

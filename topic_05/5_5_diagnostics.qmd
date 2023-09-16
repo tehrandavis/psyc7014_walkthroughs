@@ -90,14 +90,14 @@ However, with continuous predictors our data doesn't lump down neatly into group
 ```{r}
 set.seed(1)
 
-heteroscedastic_data <- tibble(predictor = runif(500, 0, 1),
-                          outcome = 5 * rnorm(500, predictor, predictor)
+heteroscedastic_data <- tibble(predictor = runif(50, 0, 1),
+                          outcome = 5 * rnorm(50, predictor, predictor)
 )
 
 ggplot(heteroscedastic_data, aes(x=predictor, y=outcome)) + 
   geom_point(color="gray") + 
   geom_smooth(method=lm, level = 0.95, color="black", se = FALSE) + 
-  theme_cowplot()
+  theme_minimal()
 ```
 
 We see here that the `outcome` becomes more variable as the predictor grows larger. This plot is demonstrating a violation of Heteroscedasticity The black line represents the line of best fit derived from running `lm`. Together, this highlights the central problem... in this case the error (residuals) increase as a function of the `predictor`. Among other things this would this may result in non-normal residuals.

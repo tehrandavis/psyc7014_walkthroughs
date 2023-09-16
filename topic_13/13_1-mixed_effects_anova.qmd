@@ -290,7 +290,7 @@ Now we can plot (not worrying about APA here). Given that interval is a within s
 
 ```{r}
 # grabbing custom function
-source("http://tehrandav.is/psyc7014/custom_functions/withinSummary.R")
+source("http://tehrandav.is/courses/statistics/custom_functions/withinSummary.R")
 
 # creating a summary table
 repdata <- withinSummary(data = example1_long,

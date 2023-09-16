@@ -8,7 +8,7 @@ This following example is taken from **Barry Cohen on Biased and Unbiased Sample
 
 > The problem is that the variance of the sample tends to underestimate the variance of the population. Of course, the variance of every sample will be a little different, even if all of the samples are the same size and they are from the same population. Some sample variances will be a little larger than the population variance and some a little smaller, but unfortunately the average of inﬁnitely many sample variances (when calculated by the formula above) will be less than the population variance. This tendency of a sample statistic to consistently underestimate (or overestimate) a population parameter is called bias. The sample variance as deﬁned by the (unnumbered) formula above is therefore called a biased estimator.
 
-We can demonstrating this fact by building a sampling distribution of variances. Let's load in our packages
+We can demonstrate this fact by building a sampling distribution of variances. Let's load in our packages
 
 ```{r}
 pacman::p_load(tidyverse, radiant, cowplot)

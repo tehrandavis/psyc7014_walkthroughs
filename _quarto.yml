@@ -35,9 +35,62 @@ book:
         - topic_02/2_1-structure_data.qmd
         - topic_02/2_2-central_tendency.qmd
         - topic_02/2_4-means_other_models.qmd
-
-    
-    
+    - part: "Part 3: INTRO to DATA VIZ"
+      chapters:
+        - topic_03/3_1-basic_ggplot.qmd
+        - topic_03/3_2-more_adv_ggplot.qmd
+        - topic_03/3_3-step_by_step.qmd
+    - part: "Part 4: DATA DISTRIBUTIONS"
+      chapters:
+        - topic_04/4_1-populations_samples.qmd
+        - topic_04/4_2-the_normal_distribution.qmd
+        - topic_04/4_3-building_intuitions_about_standardization_probability.qmd
+        - topic_04/4_4-revisiting_sampling_distributions_and_seeing_the_logic_of_nhst.qmd
+    - part: "Part 5: ASSUMPTIONS and TESTS"
+      chapters:
+        - topic_05/5_1-independence_probability.qmd 
+        - topic_05/5_2-the_normal_assumption.qmd 
+        - topic_05/5_3-heteroskedasticity.qmd 
+        - topic_05/5_4-using_performance.qmd
+    - part: "Part 6: MODELING CONTINUOUS PREDICTORS"
+      chapters:
+        - topic_06_intro_to_lm/6_1-correlation.qmd 
+        - topic_06_intro_to_lm/6_2-regression.qmd 
+        - topic_06_intro_to_lm/6_3-plotting.qmd 
+        - topic_06_intro_to_lm/6_4-example_report.qmd
+    - part: "Part 7: TESTING TWO MEANS"
+      chapters:
+        - topic_07_testing_means/7_1-ind_samples_t-test.qmd 
+        - topic_07_testing_means/7_2-paired_samples_one_sample-test.qmd 
+        - topic_07_testing_means/7_3-t-test_null_model.qmd 
+        - topic_07_testing_means/7_4-t-test_lm.qmd   
+    - part: "Part 8: POWER & EFFECT SIZE"
+      chapters:
+        - topic_08_power_effect_size/8_1-effect_size.qmd 
+        - topic_08_power_effect_size/8_2-power.qmd
+        - topic_08_power_effect_size/8_3-power_es_sig_tests.qmd
+        - topic_08_power_effect_size/8_4-simulating_power.qmd  
+    - part: "Part 9: ONEWAY ANOVA"
+      chapters:
+        - topic_09_oneway_anova/9_1-one-way-anova.qmd
+        - topic_09_oneway_anova/9_2-anova-regression.qmd
+        - topic_09_oneway_anova/9_3-posthocs.qmd
+        - topic_09_oneway_anova/9_4-planned_contrasts.qmd
+    - part: "Part 10: FACTORIAL ANOVA"
+      chapters:
+        - topic_10_factorial_anova/10_1-main_effects.qmd
+        - topic_10_factorial_anova/10_2-factorial_w_post_hocs.qmd
+        - topic_10_factorial_anova/10_3-interactions.qmd 
+        - topic_10_factorial_anova/10_4-advanced_example_and_apa.qmd 
+        - topic_10_factorial_anova/10_5-higher_order_anova.qmd
+    - part: "Part 11: REPEATED MEASURES ANOVA"
+      chapters:
+        - topic_11_repeated_measures_anova/11_1-afex_ANOVA.qmd 
+        - topic_11_repeated_measures_anova/11_2-repeated_measures_anova.qmd 
+        - topic_11_repeated_measures_anova/11_3-factorial_rma.qmd 
+        - topic_11_repeated_measures_anova/11_4-sphericity.qmd 
+        - topic_11_repeated_measures_anova/11_5-spss_rma.qmd
+  
 
     
 
@@ -47,5 +100,6 @@ format:
     toc-depth: 3
     css: styles.css
     style: "docked"
+
 
  

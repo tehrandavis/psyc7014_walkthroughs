@@ -263,7 +263,7 @@ ggplot(parent_sleep_data, aes(x = parent, y=parent_sleep, group = child)) +
 Play around with this to get a feel for how position changes.
 
 ### Title-ing
-To change the header in the legend to a capital "Child", I need to have an appreciation for what is changing in the lengend. In this case `child` is designated by both `shape` and `linetype`. I then use the `labs()` call
+To change the header in the legend to a capital "Child", I need to have an appreciation for what is changing in the legend. In this case `child` is designated by both `shape` and `linetype`. I then use the `labs()` call
 ```{r}
 ggplot(parent_sleep_data, aes(x = parent, y=parent_sleep, group = child)) +
   stat_summary(fun.data = "mean_se", geom = "pointrange", aes(shape=child), position = position_dodge(.1)) +

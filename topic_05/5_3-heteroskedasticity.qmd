@@ -1,0 +1,128 @@
+---
+title: "Homogeneity of Variance"
+format: html
+---
+
+Embracing the Heteroskedasticity (or actually not)
+
+Having wrestled with the beasts of independence and normality, let's tackle another statistical assumption. Let's dive into the realm of heteroskedasticity.
+
+## Hetero... what?
+
+Heteroskedasticity... it's mouthful, right? It's a word that's hard to say and even harder to spell. But it's a word that's important to understand. So let's break it down.
+
+Heteroskedasticity – or the lack of "homogeneity of variance" – simply means that the variability of a variable isn't consistent across all levels of another variable. We typically refer to homogeneity of variance when we are testing with categorical predictors (like $t$-tests and ANOVA) and heteroskedasticity when considering continuous predictors (regression), but they are one in the same. 
+
+### Categorical Example
+
+For example, let's imagine that we are comparing the household incomes of two Cinci neighborhoods based on data from [here](https://www.point2homes.com/US/Neighborhood/OH/Cincinnati-Demographics.html) 
+
+```{r}
+pacman::p_load(tidyverse)
+two_hoods <- tibble(WestEnd = rnorm(n = 30,mean = 65000,sd = 15000),
+                     Northside = rnorm(n = 30, mean = 65000, sd = 8000)) %>% 
+  pivot_longer(cols = c("WestEnd", "Northside"), names_to = "neighborhood",values_to = "income")
+  
+ggplot(two_hoods, aes(x=neighborhood, y=income)) + 
+  stat_summary(fun = "mean", size=1, fill="lightgray", geom = "bar") +
+  geom_point() +
+  theme_minimal()
+```
+
+As you can see in the plot above, even though the mean incomes for the neighborhoods are the same, the variances of the two neighborhoods are quite different. This reflects a wider dispersion of incomes in West End, where the mean is a consquence of a few high income households balancing against lower income households (gentrification, perhaps?). In Northside, the gap between households in our sample is not so great.
+
+### Continuous example
+
+Suppose you're analyzing data from West End, specifically looking at homeowners. One interesting aspect to consider is the connection between household income and the price of the homes they've purchased.
+
+Common sense suggests that those with limited incomes might be restricted to homes within a certain price range, mainly because there's a limit to how much house you can afford with a limited budget. However, as incomes increase, the range of choices also grows. A high-income household could afford a more expensive house, but they might also decide on a more modest home, allocating money elsewhere like investing or travel.
+
+Given this, we might expect a greater variability in home prices among higher income households compared to those with lower incomes. Let's take a look at some hypothetical data to illustrate this point.
+
+```{r}
+set.seed(42)
+
+# Create a sample of 200 households
+n <- 200
+income <- rnorm(n, mean = 65000, sd = 12000)
+
+# Generate house prices based on income, but introduce more variability for higher incomes and less for lower incomes
+baseline_price <- 230000 + 7 * income
+
+# Adjust variability for higher and lower incomes
+# Here, we're using a fraction of the income as the standard deviation for the variability
+variable_component <- rnorm(n, mean = 0, sd = income * .8)
+house_price <- baseline_price + variable_component
+
+# Clamp house prices between 230K and 800K
+
+household_data <- tibble(income, house_price)
+
+# Plot
+ggplot(household_data, aes(x=income, y=house_price)) + 
+  geom_point(color="gray") + 
+  geom_smooth(method=lm, level = 0.95, color="black", se = FALSE) + 
+  theme_minimal() 
+```
+
+Examining the plot, you might observe a trend in the variability of home prices as incomes rise. This demonstrates the potential choices and variability middle and high-income earners have when purchasing homes in West End (compared to lower income earners). 
+
+## Why is this an issue?
+
+So what? Why does this matter? The answer lies in our second plot. Looking at the plot again, what stands out?
+
+```{r}
+ggplot(household_data, aes(x=income, y=house_price)) + 
+  geom_point(color="gray") + 
+  geom_smooth(method=lm, level = 0.95, color="black", se = FALSE) + 
+  theme_minimal() 
+```
+
+If you guessed "the predictive model tends to perform worse for middle income earners" then you'd be correct!. To really hammer this home let's create a plot of the model error (residuals) as a function of income.
+
+```{r}
+model <- lm(house_price~income, household_data)
+model_residuals <- residuals(model)
+
+household_data <- 
+    household_data %>% 
+    mutate(residuals = model_residuals)
+    
+ggplot(household_data, aes(x = income, y = residuals^2)) +
+    geom_col(color = "red")
+```
+
+Ideally we'd like these residuals to be consistent across the entire range of incomes.
+
+## Testing for heteroskedasticity
+
+More often than not, you'll be testing for heteroskedasticity in the context of a model. Using our two examples above we can build two very simple linear models for now that we can revisit in upcoming weeks. In the categorical predictors case, we had two `neighborhoods` that we were comparing for `income`. As simple model here would be to look at our outcome variable, `income` as a function of our predictor(s), neighborhood. In `R` the `~` symbol is literally interpreted as "is a function of", so we can write this relationship as: `income ~ neighborhood`
+
+We can define this simple linear model as so:
+
+```{r}
+categorical_model <- lm(formula = income ~ neighborhood, data = two_hoods)
+```
+
+To test for homogeneity of variance with categorial predictors we use **Levene's Test**. A basic version of this test can be performed using `car::leveneTest` (note that `car` is installed on base `R` so you should not need to install it).
+
+```{r}
+car::leveneTest(categorical_model)
+```
+
+The *null hypothesis* of the `leveneTest` is that the groups' variances are homogeneous. Thus, a `p` < than .05 is seen as sufficient evidence to reject the null.
+
+For continuous predictors, we can use the **Breusch-Pagan Test**. This test is not available in base `R` but can be found in the `olsrr` package. Let's consider our continuous predictor example predicting house price as a function of houldhold income, or `house_price~income`:
+
+```{r}
+continuous_model <- lm(house_price~income, household_data)
+```
+
+And now to test for heteroskedasticity:
+
+```{r}
+pacman::p_load(olsrr)
+ols_test_breusch_pagan(continuous_model)
+```
+
+As with the Levene's Test, the null hypothesis here is that the variance is homogeneous, or rather NOT heteroskedastic. Therefore a reported p-value (here evaluated along the $\chi^2$ distribution (`Chi2`) that is less than .05 means that the model has violated this assumption.

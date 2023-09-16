@@ -1,6 +1,6 @@
 # Load packages ----------------------------------------------------------------
 
-pacman::p_load(shiny, tidyverse, gridExtra, trelliscopejs)
+pacman::p_load(shiny, tidyverse, gridExtra, trelliscopejs, SimDesign)
 
 # Define UI --------------------------------------------------------------------
 
@@ -11,13 +11,6 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       wellPanel(
-        # Select distribution ----
-        radioButtons("dist", "Parent distribution (population):",
-                     c("Normal" = "rnorm",
-                          "Right skewed" = "rlnorm",
-                          "Left skewed" = "rbeta"),
-                     selected = "rnorm"),
-        # hr(),
         
         # Distribution parameters / features ----
         uiOutput("mu"),

@@ -1,0 +1,172 @@
+---
+title: ""
+format: html
+---
+
+Up to this point in class, we've laid out the logic of the sampling distribution (of means), the difference distribution (of means), and the null distribution (of means). In the workshop, we made it as far as simulating the sampling distribution and using it to obtain important measures and generate the distribution of means. Here, I'm going to extend that work to show how to get both the difference distribution and the null distribution. This involves minor tweaks of what was done in class.
+
+Please follow along by entering the commands into your own console. First, let's load the appropriate packages for this week:
+
+```{r}
+pacman::p_load(psych, tidyverse, radiant)
+```
+
+## Population v. sample parameters
+
+To begin, let's start off with a population. For the sake of example, let's imagine that this population represents the obtained IQ scores of students at Tehran J. Davis High School (apparently, I'm feeling myself) who were taught using a standard curriculum. The 5000 students (it's a really big school) in this population have a mean IQ of 103 with a standard deviation of 14. Note that this mean and standard deviation are FACTS—true values that exist independently of my measurement. Also, note that in real work, these truths about the population are rarely known.
+
+We can create a simulated population using the following chunk of code; note that anytime you are generating "random" distributions or "random" sampling in `R`, you'll need to input the `set.seed(123)` command where I do to ensure that you get the same numbers I do:
+
+```{r}
+# Population of 5000 with an approximate mean = 100 and SD = 14
+set.seed(123)
+pop_basic <- rnorm(n = 5000, mean = 103, sd = 14)
+```
+
+**Note:** Technically, there is an issue using these simulated scores for IQ. `rnorm()` assumes a continuous distribution, including decimals. We typically do not report IQ scores to the decimal. To clean this up, I would need to take the obtained scores and apply the `round()` function.
+
+```{r}
+pop_basic <- pop_basic %>% round()
+```
+
+When we take a look at what the above simulation generates, we see that the obtained values are slightly different than requested (it is random after all). BUT AGAIN, for the purposes of example, these are still the facts of the population.
+
+```{r}
+mean(pop_basic)
+radiant.data::sdpop(pop_basic)
+```
+
+Wait... what's that `radiant.data::sdpop()` mess?!?!?
+
+*Remember* that calculating the standard deviation of a population is different from calculating it for a sample, where the sample SD requires an adjustment for the degrees of freedom. Simply, the population SD uses $N$ in the denominator, while the sample SD uses $N-1$. The `sd()` function calculates sample SD. To get population SD, we can use the function `popsd()` from the `multicon` package.
+
+From this population, the Principal of TJD-HS tells us that we can only administer our IQ test to 250 students. This represents our sample:
+
+```{r}
+mySample <- sample(x = pop_basic, size = 250)
+psych::describe(mySample)
+hist(mySample)
+```
+
+If we run the above code again, we see that we get different measures for `mySample`:
+
+```{r}
+mySample <- sample(x = pop_basic, size = 250)
+psych::describe(mySample)
+hist(mySample)
+```
+
+And in **neither case is the observed sample mean identical to the true population mean**.
+
+These differences highlight the notion of **Variability due to chance**—the fact that statistics (e.g., means, SDs) obtained from samples naturally vary from one sample to the next due to the particular observations that are randomly included in the sample.
+
+The term **sampling error** is used to refer to variability due to chance, in that, the numerical value of a sample statistic will probably deviate (be in error) from the parameter it is estimating.
+
+In class, we mentioned that we can build a theoretical distribution of **sampling error**, a sampling distribution of means. Essentially, our goals are the following steps:
+
+1. Pull a sample of a given size from the population.
+2. Get the mean of that sample.
+3. Save that sample mean to a vector.
+4. Repeat steps 1-3.
+
+How many times do we repeat? Theoretically, an infinite number of times. Because we can't wait for infinity, let's just use a really big number like 100,000 (or 1e+05).
+
+Building the sampling distribution of means (using `pop_basic` from above), note that the comments highlight what each line/pipe argument is doing:
+
+```{r}
+sampling_distributions <- 
+  # tibble: create a table with a column "simulation" that contains values 1:100000
+  tibble(simulation = 1:100000) %>%
+  # group_by: perform every function after this for EACH num:
+  group_by(simulation) %>% 
+  # mutate: add a column "sample_mean" that contains the mean for simulation num:
+  mutate(sample_mean = mean(sample(pop_basic, size = 250, replace = T)))
+```
+
+Let's take a look at our sampling distribution:
+
+```{r}
+hist(sampling_distributions$sample_mean, main = "Theoretical sampling distribution")
+```
+
+And the grand mean of the sampling distribution (the mean of means if you will):
+
+```{r}
+mean(sampling_distributions$sample_mean)
+```
+
+Again, not quite the TRUE mean of the population, but pretty darn close.
+
+## Standard Error of the Mean
+
+We've also learned that the standard error (SE) of the mean is simply the standard deviation of the sample distribution. That is, how much does the mean vary due to chance provided repeated sampling. In this case, it can be found by:
+
+```{r}
+sd(sampling_distributions$sample_mean)
+```
+
+However, deriving the SE in this way assumes that we are free to sample and re-sample the population a large number of times (in this case 100 thousand) when in reality we may have neither the time, resources, nor inclination to do so. Instead, we use the following equation to provide an estimate of SE provided our sample:
+
+$$SE=\frac{SD_{sample}}{\sqrt{N_{sample}}}$$
+
+So in this case, for a given `mySample` from the population `pop_basic`:
+
+```{r}
+set.seed(1)
+mySample <- sample(x = pop_basic, size = 250)
+mySample_se <- sd(mySample)/sqrt(250)
+show(mySample_se)
+```
+
+Compared to the theoretically derived SE above, the estimate is not too far off (0.895 vs. 0.884).
+
+## The Difference Distribution
+
+Imagine for the sake of example, we are interested in IQ. A central debate (as I understand the literature) at present is whether IQ is inherently static or can be improved with education. Indeed the implication of this can be quite controversial (IQ testing is like the third rail of understanding intelligence... making statements about intelligence is like the third rail of psychology
+
+... but I digress).
+
+In addition to our population of students taking the basic curriculum, we also have an equal number of students taking an advanced curriculum. Assuming that we have already controlled for other factors (e.g., baseline IQs from both groups the same before treatment) we would like to address the following question using data obtained from each group: "Does the enhanced curriculum result in higher IQ?"
+
+First, let's create our populations:
+
+```{r}
+set.seed(1)
+pop_basic <- rnorm(n = 5000, mean = 103, sd = 14)
+pop_advanced <- rnorm(n = 5000, mean = 108, sd = 13)
+```
+
+Again, you'll note that in this example we're omnipotent and know the truth of the matter (the true measures)... in the real world no one is all-seeing and knowing. You'll also notice that I kept the SD for each population roughly equivalent. This *homogeneity of variances* (i.e., SDs should be approximately equal) is another assumption of our non-parametric tests (like ANOVA). Here I've made it so, but if in reality the variances are not equal then we may have to adjust how we proceed with our analyses. More on that in a few weeks!
+
+And now to create our difference distribution using the same programming logic as above:
+
+```{r}
+difference_distribution <- 
+  # tibble: create a table with a column "simulation" that contains values 1:100000
+  tibble(simulation = 1:100000) %>%
+  # group_by: perform every function after this for EACH num:
+  group_by(simulation) %>% 
+  # mutate: add a column "basic_mean" that contains the mean for simulation num
+  #         same for "advanced_mean"
+  #         get difference between the two samples for that simulation
+  mutate(basic_mean = mean(sample(pop_basic, size = 250, replace = T)),
+         advanced_mean = mean(sample(pop_advanced, size = 250, replace = T)),
+         difference_means = advanced_mean - basic_mean)
+```
+
+Now, let's take a look at the resulting difference distribution:
+
+```{r}
+mean(difference_distribution$difference_means)
+hist(difference_distribution$difference_means, main = "Theoretical difference distribution")
+```
+
+As anticipated (because we know all), we end up with a difference distribution with a mean difference of about 5. What we are asked to consider is whether this difference (or any observed difference, really) is enough to say that the likelihood of it occurring by chance is sufficiently small (i.e., is $p < .05$). For this, we need to create a null distribution.
+
+## The Null Distribution
+
+The logic of constructing a null distribution rests on the claims made by the null hypothesis, that the means of the two (or more) populations in question are identical:
+
+$$\mu_1=\mu_2$$
+
+In a larger sense, if the null hypothesis is indeed true, it suggests that the two populations may indeed be one single population. Here, we know that the null hypothesis is NOT true (again, all-seeing and knowing).

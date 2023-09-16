@@ -1,0 +1,319 @@
+---
+title: "Multiple comparisons in One-way ANOVA, pt. 1: post hoc tests"
+---
+
+## TLDR; Steps for running a posthoc test of means
+
+This walkthrough requires the following to be installed / loaded in `R`
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# use pacman to check, install, and load necessary packages
+pacman::p_load(agricolae,
+               cowplot, 
+               tidyverse, 
+               emmeans,
+               multcomp,
+               psych,
+               sjstats)
+```
+
+1.  Be sure that the column that contains your IV is indeed being treated as a factor. If it is `levels(IV)` will list your levels, also the column containing the IV will contain `<fct>`.
+2.  build an ANOVA model using `lm()`, `aov()`, or `afex()` (output to lm)
+3.  run your post-hoc comparisions using the p.adjustment of your choice (tukey, holm, bonferroni)
+
+Example (I recommend running this line-by-line)
+
+```{r}
+# Preliminaries
+## load in data
+dataset <- read_table2("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Tab12-1.dat")
+
+# Step 1
+## check data, identify columns
+dataset
+
+## Group is numerically coded. Fixing this and turning to a factor
+dataset$Group <- recode_factor(dataset$Group, "1"="MS","2"="MM","3"="SS","4"="SM","5"="McM")
+
+# Step 2: Run the model
+model_aov <- lm(Time~Group, data = dataset)
+
+# Step 3: Test the model for significant F-value
+model_aov %>% sjstats::anova_stats()
+
+# Step 4: post-hoc analysis in this example "tukey", but could also be "bonf" or "holm"
+emmeans(object = model_aov,specs = ~Group, adjust="tukey") %>% pairs()
+```
+
+## Comparing means in the ANOVA model
+
+In AoV, part 1, introduced the One-Way ANOVA. ANOVA is useful when we are comparing 3 or more group means such that the null hypothesis is:
+
+$$\mu_1=\mu_2=\mu_3...=\mu_n$$.
+
+In this case, if a single mean is revealed to be significantly different from the others, then the null is rejected. However, rejecting the null only tells us that at least one mean was different from the others; it does not tell us which one or how many. For example with just three means, it could be the case that:
+
+-   $\mu_1≠\mu_2=\mu_3$
+-   $\mu_1=\mu_2≠\mu_3$
+-   $\mu_1=\mu_3≠\mu_2$
+-   $\mu_1≠\mu_2≠\mu_3$
+
+Simply getting a significant *F*-value does not tell us this at all. In order to suss out any differences in our groups we are going to need to make direct comparisons between them.
+
+Enter multiple contrasts. Multiple contrasts are a way of testing the potential inequalities between group means like those above. As always, both Navarro and Poldrack do wonderful jobs of laying out the mathematics and logic of multiple comparisons. As with Part 1 I focus on practical implementation and spend some time focusing a bit on potential landmines and theoretical concerns as I see them.
+
+This vignette assumes that you have the following packages installed and loaded in R:
+
+```{r warning = FALSE, message=FALSE}
+
+# use pacman to check, install, and load necessary packages
+pacman::p_load(agricolae,
+               cowplot, 
+               tidyverse, 
+               emmeans,
+               multcomp,
+               psych,
+               sjstats)
+```
+
+## The data: Siegel's 1975 study on the effects of morphine
+
+To start, lets download Siegel's (1975) data set on Morphine Tolerance. This data set can be found on the web. Before diving into the data, check a description of the experiment in the **Siegel_summary.pdf** file in the walkthroughs folder. When you are done, come back a we'll work on analyzing this data.
+
+```{r downloading the dataset}
+# grab data from online location:
+dataset <- read_table2("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Tab12-1.dat")
+
+# convert dataset$Group number codes to named factor levels:
+dataset$Group <- recode_factor(dataset$Group, "1"="MS","2"="MM","3"="SS","4"="SM","5"="McM")
+
+# get descriptive stats for this data by Group
+psych::describeBy(dataset$Time,dataset$Group)
+```
+
+And a quick peek at this data:
+
+```{r}
+ggplot(data = dataset,aes(x=Group,y=Time)) +
+  stat_summary(fun = mean, geom = "bar") +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(width=.25)) +
+  scale_y_continuous(expand = c(0,0)) + expand_limits(y=c(0,35)) + theme_cowplot()
+```
+
+## Running the One-way ANOVA
+
+Now that our data is properly coded we can run our omnibus ANOVA. My own personal preference is to run the ANOVA using `lm()`. This makes like a lot easier when dealing with contrasts, especially if you decide to employ the method that Field suggests in his guide. FWIW, I typically use another method as seen below, but I'll talk a little bit about why I prefer it to Fields method. That said, recall from Part 1 that using the `aov()` function gives you the same result. Depending on which you choose, you can use the `summary(morphine_mdl)` or `anova(morphine_mdl)` to switch back and forth to get the info that you desire:
+
+```{r}
+# running the ANOVA using lm:
+morphine_mdl <- lm(formula = Time~Group,data = dataset)
+# using the anova() function to display as ANOVA table
+anova(morphine_mdl)
+# full anova output (preferred)
+sjstats::anova_stats(morphine_mdl)
+```
+
+So we see here that we have: $F(4,35)=27.33,p<.001,\eta_p^2=.75$
+
+Remember again that the **only** thing that the omnibus ANOVA tells us is that there is an inequality in our means. In this respect, the omnibus begs more questions than it answers---which means are different from which. In order to get this answer we need to run direct comparisons between our means. There are two ways of going about this, we can either *(1)* plan beforehand what differences in means are especially relevant for us and focus on those, or *(2)* take a look at all potential differences without any specified predictions. In Case 1, we are performing **planned contrasts**; in Case 2, we use **post hoc** tests. More often than not, you will see researchers analyzing differences in means using post hoc tests---that is they run the ANOVA, find that it is significant, and run a battery of pairwise comparisons. It is sometimes the case that of that battery of comparisons, only a select few are actually theoretically relevant. However, if there is a theory-driven case to be made that you are predicting differences between a few select means in your data, then there is an argument to be made that you should run your planned contrasts independent of your ANOVA. That is, you are technically only permitted to run post-hoc tests if your ANOVA is significant (you can only go looking for differences in means if your ANOVA tells you that they exist), whereas planned contrasts can be run regardless of the outcome of the omnibus ANOVA (indeed, some argue that they obviate the need to run the omnibus ANOVA altogether).
+
+My guess is that most of you have experience with post-hoc tests. They are more commonly performed tend to be touched upon in introductory stats courses. So we will spend a little time on these first before proceeding to a more in depth treatment of planned contrasts.
+
+## Post-hoc tests
+
+**We use a post-hoc test when we want to test for differences in means that we have not explicitly predicted prior to conducting our experiment**. As a result, whenever we perform a post-hoc test, we need to adjust our critical p-values to correct for inflation of Type 1 error. Recall from earlier discussions that the odds of committing a Type 1 error (falsely rejecting the null) is $1-(1-\alpha)^c$ where $\alpha$ is you critical p-value and $c$ is the number of comparisons that are to be performed. Typically we keep this at .05, so when conducting a single test, the likelihood of committing a Type 1 error is: $1-(1-.05)^1=1-0.95^1=0.05$
+
+However as we increase the number of comparisons, assuming an $\alpha$ of 0.05:
+
+-   2 comparisons = $1-.95^2=0.0975$
+-   3 comparisons = $1-.95^3=0.1426$
+-   4 comparisons = $1-.95^4=0.1855$
+-   5 comparisons = $1-.95^5=0.2262$
+
+Obviously, we need to control for this. The post-hoc methods that were introduced this week are all similar in that they involve comparing two means (*a la t*-test) but differ in how the error is controlled. For example a Bonferroni-Dunn correction (which is often used as a post-hoc correction, although initially intended for correcting planned comparisons) adjusts for this by partitioning the significance (by diving your original alpha by the number of comparisons). A popular variant of this method, the Holm test, is a multistage test. It proceeds by ordering the obtained *t*-values from smallest to largest. We then evaluate the largest *t* according to the Bonferroni-Dunn correction $\alpha/c$. Each subsequent comparison *t* value, $n$ is evaluated against the correction $\alpha/(c-n)$. Please note I mention the these two methods with post-hoc analyses, although in true they are intended for planned comparisons. However, in instances in which the number of comparisons is relatively small, I've often seen them employed as post-hocs.
+
+So how many comparisons is relatively small? I'd suggest best form is to use the above methods when you have 5 or fewer comparisons, meaning that your critical $\alpha$ is .01. That said, with a post hoc test, you really do not have a choice in the number of comparisons you can make, you need to test for all possible comparisons on the IV. Why? well if not you are simply cherry picking your data. For example it would be poor form to take a look at our data like so:
+
+Plot:
+
+```{r}
+ggplot(data = dataset,aes(x=Group,y=Time)) +
+  stat_summary(fun.y = mean, geom = "bar") +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(width=.25)) +
+  scale_y_continuous(expand = c(0,0)) + expand_limits(y=c(0,35)) + 
+  theme_cowplot()
+```
+
+and then decide that you *only* want to compare 'McM' to 'MS' because that's where you see the greatest differences. Or that you simply want to take a look at "MM" and "SS" *without considering the rest*.
+
+Since you did not plan for or explicitly predict these differences from the outset, you are simply banking on what I like to say might be a "historical accident", that you simply stumbled into these results. As such, it's deemed as proper for to test *all* contingencies.
+
+In the case above there are $(5!)/(2!)(5-2)!$ = 10 combinations. If we were to run a Bonferroni correction in this case or critical $p$ would need to be $.05/10=.005$ which is an extremely conservative value, and thus dramatically inflates the likelihood of Type II error. In cases like this, Tukey's HSD is the traditionally preferred method, as it takes into account the characteristics of your data (in particular the standard error of the distribution) when calculating the critical $p$ value. As such in cases where many post-hoc, pairwise comparisons are made, Tukey's HSD is less conservative than a Bonferroni adjustment.
+
+One final method that is becoming more *en vogue* is the Ryan, Einot, Gabriel, Welsch method (REGWQ). Whereas Tukey's method holds the critical $p$ constant for all comparisons (at the loss of power) the REGWQ allows for an adjustment for the number of comparisons. It is currently being promoted as the most desirable post-hoc method.
+
+### Bonferonni-Dunn and Holm tests
+
+In `R` there are several ways in which we can call post hoc corrections. For example we can call the Bonferonni and Holm adjustments using `pairwise.t.test()` function from the `base` package (already installed). The `pairwise.t.test()` method asks you to input:
+
+-   `x` = your DV
+-   `g` = your grouping factor
+-   `p.adjust.method` = the name of your desired correction in string format
+
+First let's run the `pairwise.t.tests` with no adjustment (akin to uncorrected $p$ values):
+
+```{r}
+pairwise.t.test(x = dataset$Time, g = dataset$Group,p.adjust.method = "none")
+```
+
+You see above that we get a cross-matrix containing the $p$ values for each cross pair (row × column). Remember this is something we would never do in a post hoc (no corrections) but I wanted to first run this to illustrate a point. Now let's run the the Bonferroni and Holm corrections:
+
+### Bonferroni example (pairwise.t.test())
+
+```{r}
+pairwise.t.test(x = dataset$Time, g = dataset$Group,p.adjust.method = "bonferroni")
+```
+
+You'll note that the `p-values` displayed here are 10x the p-values from the uncorrected matrix. To demonstrate this:
+
+```{r}
+uncorrected <- pairwise.t.test(x = dataset$Time, g = dataset$Group,p.adjust.method = "none")
+bonf_corrected <- pairwise.t.test(x = dataset$Time, g = dataset$Group,p.adjust.method = "bonferroni")
+
+bonf_corrected$p.value/uncorrected$p.value
+```
+
+-   note that the `1.378` value is the result of p being capped at $p=1$ in the Bonferroni corrected comparison.
+
+Remember from a few paragraphs back that there are 10 possible combinations so the Bonferonni test would need to divide the critical alpha by 10. What this means is that anytime you perform a correction, `R` actually adjusts the $p$ values for you; therefore you may interpret the output against your original (familywise) $\alpha$. So here, any values that are still less than .05 after the corrections are significant.
+
+Moving on...
+
+### Holm example (pairwise.t.test())
+
+```{r}
+pairwise.t.test(x = dataset$Time, g = dataset$Group,p.adjust.method = "holm")
+```
+
+## Tukey HSD and REGWQ tests
+
+In order to run Tukey's HSD and REGWQ methods we call upon the `agricolae` package. In this case, we need to input our `lm() model` into the function, as well as identify our "treatment" (in this case our "Group" factor). For example:
+
+### Tukey HSD example (agricolae)
+
+```{r}
+morphine_mdl <- lm(Time~Group,data = dataset) # from above
+agricolae::HSD.test(morphine_mdl,trt = "Group",group = T,console = T) 
+```
+
+Note that the `group` and `console` arguments pertain to the output. You typically will want to keep console set to `TRUE` as that simply prints the output of your test. The `group` argument controls how the output is presented. Above we set it to `TRUE.` This results in an output that groups the treatment means into subsets where treatments with the same letter are not significantly different from one another, known as *compact letter displays*. For example, *a*s are not significantly different from each other, *b*s are not significantly different from each other, **but** *a*s are different from *b*s. Conversely if you wanted to see each comparison you can set this to `FALSE`:
+
+```{r}
+agricolae::HSD.test(morphine_mdl,trt = "Group",group = FALSE,console = TRUE) 
+```
+
+Finally, if you do decide to group (`group=TRUE`), you can take the outcome of this function and use it to generate a nice group plot. This is useful for quick visual inspection.
+
+```{r}
+agricolae::HSD.test(morphine_mdl,trt = "Group",group = T,console = T) %>% plot()
+```
+
+### REGWQ example (agricolae)
+
+The same applies to REGW, using the `REGW.test()` function (with `group=F`, I'm showing all of the comparisons):
+
+```{r}
+agricolae::REGW.test(morphine_mdl,trt = "Group",group = F,console = T) 
+```
+
+Compact letter displays are nice (SPSS generates them, too), but as seems to always be the case, there is some controversy as to whether we should use them. Taken from this vignette:
+
+> CLD displays promote visually the idea that two means that are "not significantly different" are to be judged as being equal; and that is a very wrong interpretation. In addition, they draw an artificial "bright line" between P values on either side of alpha, even ones that are very close.
+
+## Using estimated marginal means, `emmeans()`
+
+In previous years I would have stopped here and left you with the impression that you may need to call different packages depending on what post-hoc (or later, contrast) you intend to run. While this is perfectly acceptable, more and more I am using the estimated marginal means (package) to perform just about all of my post hoc analyses and contrasts. From the `emmeans` vignette [(link)](https://cran.r-project.org/web/packages/emmeans/vignettes/basics.html#EMMdef):
+
+> Estimated marginal means are based on a model -- not directly on data. The basis for them is what we call the reference grid for a given model. To obtain the reference grid, consider all the predictors in the model.
+
+(The notion of a reference grid will become more apparent when we more into factorial ANOVA For now, let's just focus on practical implementation).
+
+I typically use this framework as it allows for a higher level of flexibility in analyzing contrasts while still being unified. We'll see just how far we can go in the upcoming weeks. For now, let's use the `emmeans` package to perform our post-hoc analyses from above.
+
+We start by throwing our model into the `emmeans()` function, specifying our test as a function of our comparison. We also need to tell `R` what adjustment (correction) we desire. To remind ourselves, our model is:
+
+```{r}
+morphine_mdl <- lm(formula = Time~Group,data = dataset)
+```
+
+For a `pairwise` test with a `bonferroni` correction we need to specify what factor (or predictor or IV) we are running our pairwise comparisons on (`spec =`), and that we are `adjusting` by using the bonferonni (`bonf`). This takes the general form:
+
+```{r}
+emmeans(morphine_mdl, specs = ~Group) %>% pairs(adjust="bonf")
+```
+
+`emmeans` also allows us to run a pairwise Tukey test:
+
+```{r}
+emmeans(morphine_mdl, specs = ~Group) %>% pairs(adjust = "tukey")
+```
+
+## Alternative to CLD()
+
+One thing to note, the curator of the `emmeans()` package is not a fan of `cld` (Compact Letter Displays) and instead has created `pwpp` as a visualization tool.
+
+```{r}
+emmeans(morphine_mdl, specs = ~Group) %>% pwpp()
+```
+
+You can visit [this vignette](https://cran.r-project.org/web/packages/emmeans/vignettes/comparisons.html) to get a feel for what is at issue here.
+
+## Effect sizes
+
+Typically when reporting the effect size of the difference between two means we use Cohen's $d$. However, calculating Cohen's \$d\$ in a posthoc contrast is slightly more involved than the method used for a regular t-test. This is because with a regular t-test you only have 2 means from 2 samples that you have collected. In the case of pairwise contrasts in ANOVA, while you are only comparing two means, those means are nested within a larger group (e.g., when comparing MS and MM, we still need to account for the fact that we also collected samples from SS, SM, and McM). That is, you need to understand the difference between the two means **in the context of the entire model.**
+
+Simply put, in our calculations we need to account for the influence of all of our collected groups. This is done by placing the contrasted difference in the context of the Root Mean Square Error, or the square root of the Mean Square Error of the residuals in our ANOVA model. Recall that typically Cohen's $d$ is the **difference between the two means** divided by their **pooled standard deviation**. Here, $d$ is the **difference between the two means** divided by ***sigma, or the estimated standard deviation of the errors of the linear model.***
+
+To do this we're going to need two things from the original model. Let's take a look at the model summary:
+
+```{r}
+morphine_mdl %>% summary()
+```
+
+The values line that is important to us is the `Residual standard error ___ on __ degrees of freedom`---in this case the values **5.657** and **35** respectively.
+
+Assuming you have run your comparisons using `emmeans()` you can calculate your effect sizes for each comparison using `emmeans::eff_size()`.
+
+`eff_size()` takes three arguments:
+
+-   the emmeans object
+-   the estimated standard deviation of the errors of the linear model, `sigma`
+-   the residual degrees of freedom from the model, `df.residual`
+
+The functions `sigma()` and `df.residual()` allow us to get this information directly from the model. A typical call would look something like this
+
+```{r}
+# save your contrasts to an object
+mdl_contrasts <- emmeans(morphine_mdl, specs = ~Group)
+
+# use the saved object in the following function
+eff_size(mdl_contrasts,sigma = sigma(morphine_mdl), df.residual(morphine_mdl))
+```
+
+That said, there is some debate as to whether this is the most appropriate way to calculate posthoc effect sizes, or whether posthoc effect sizes are in general a proper thing to calculate. I've personally never had a reviewer ask for one, **BUT** if I had to provide on I would use this method.
+
+FWIW, this won't be the last time that we need to call back to the original (omnibus) ANOVA when conducting posthoc tests. Things get a little messier next week!
+
+## Reporting and ANOVA with post hoc analyses.
+
+In your report, you need to include information for the main ANOVA as well as information related to
+
+-   the omnibus ANOVA
+-   a statement on what multiple comparisons were run and how corrected
+-   note which comparisons were significant.
+
+If we work off of our last example, you'll note that there are quite a few comparisons that we could discuss (10 in fact). In cases like these you could either put this information into a formatted table, or simply highlight a few that are especially relevant. For example, looking at the `emmeans()` outcome as well as the `CLD` plot from `agricolae::HSD.test` we see that McM and SM (a's) in the CLD plot are both significantly greater than the remain conditions (b's). Based on this I would write something like:
+
+... Our ANOVA revealed a significant effect for Morphine treatment group, *F*(4, 35) = 27.325, *p* \< .001. Tukey pairwise comparisons revealed that the mean tolerance times for the both the SM ($M±SD$: 24.00 ± 6.37) and McM (29.00 ± 6.16) groups were greater than the remaining three groups ($ps$ \< .05), but not different from one another. The mean times for the remaining three conditions were not significantly different from one another, $ps > .05$ (see Figure 1)
+
+-   assuming Figure 1 is a camera ready plot you've created in `ggplot()`. Any of the barplots in this walkthrough will suffice.
