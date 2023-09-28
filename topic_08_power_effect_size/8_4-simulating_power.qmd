@@ -9,6 +9,7 @@ pacman::p_load(tidyverse, cowplot, infer, glue)
 Note that the `pwr` package in R is limited to what it can do. It can only perform basic power analyses. For more complex power calculations, like those tied to more complex models including factorial and repeated measures ANOVA, you will need to download **gpower** a free stand-alone power software or you have to find other packages in R or build a Monte-Carlo simulation. In this walkthrough I'll build intuitions on how to do the latter. To do this I'll be leveraging an assumed and a known:
 
 1.  I am **assuming** that you are somewhat comfortable with the notion of simulating data, given your experiences in the past few weeks. We are going to be leveraging some of the tools and ideas that you used when building your sampling distributions using simulated data (e.g., bootstrapping).
+   
 2.  I am leveraging a **known** consequence of the definition of power. Namely a designs power is the probability that it will correctly reject the null hypothesis. Restated, its the probability that you will get a significant result (*p* \< $\alpha$) given that there is a true difference or relationship in your data.
 
 Together, (1) and (2) mean that given a certain set of parameters, including mean differences, variability, sample size and $\alpha$ if I simulate collecting data and running a test 100 times, and 80 of those times my test yields a significant result, then my power is .80.
@@ -35,7 +36,7 @@ I think a good place to start is revisiting our examples from a few weeks back. 
 
 -   and a performed test including significance level.
 
-We noted that to perform a power analysis we needed to know values for 3 out of 4, where the goal of the analysis is to calculate the 4th. For example, tin the typical power analysis we want to know the number of participants that we will need for our study given a known effect size, `d=.4` and a desired power-level, typically .8. In the case that we are running a independent (two) sample t-test with an $\alpha$ of .05, we can run this analysis algorithmically by calling the following in `R`:
+We noted that to perform a power analysis we needed to know values for 3 out of 4, where the goal of the analysis is to calculate the 4th. For example, in the typical power analysis we want to know the number of participants that we will need for our study given a known effect size, `d=.4` and a desired power-level, typically .8. In the case that we are running a independent (two) sample t-test with an $\alpha$ of .05, we can run this analysis algorithmically by calling the following in `R`:
 
 ```{r}
 library(pwr)
@@ -181,11 +182,11 @@ ggplot(power_table, aes(x = n_participants, y = power)) +
   geom_hline(yintercept = .8, lty = "dashed")
 ```
 
-# No one man should have all that `Superpower`
+## No one man should have all that `Superpower`
 
 The two examples above were to provide a gist of how to conduct a simple power analysis using simulation methods. Moving forward, we'll ramp up the complexity of our designs by including ANOVA. One thing that is apparent is that creating the simulated datasets as above may become a little cumbersome. Fortunately for us, there are packages in `R` that do the heavy lifting in this process for us.
 
-A relatively new, but powerful (haha) package is `Superpower` (haha) developed by Daniel Lakens and Aaron Caldwell. A paper outlining this package can be found [here](https://psyarxiv.com/baxsf/). Let's load in the package:
+A relatively new, but powerful (haha) package is `Superpower` developed by Daniel Lakens and Aaron Caldwell. A paper outlining this package can be found [here](https://psyarxiv.com/baxsf/). Let's load in the package:
 
 ```{r}
 pacman::p_load(Superpower)
@@ -245,7 +246,7 @@ ANOVA_power(design_result = my_ANOVA_design,
 
 The output provides estimates of power based upon the provided parameters. For our purposes, the pairwise t-test, we would refer to the outputs labelled `pairwise`
 
-# Moving forward
+## Moving forward
 
 For now, this is where I leave you. The goals here were to provide you with a conceptual basis for how we can run power analyses using simulations as well as an introductory example. In future walkthroughs, I will show an example of how to conduct a power analysis given each of the designs that we will encounter. For those that want to get a head start I would check out these two wonderful resources from the authors of `Superpower`
 

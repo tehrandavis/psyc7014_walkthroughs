@@ -4,7 +4,7 @@ title: "The One-way ANOVA"
 
 ## ANOVAs for comparing means
 
-This week we covered **ANOVA**. A major emphasis in the material (especially Winter's optional text) is that ANOVA (much like many of the other tests that we cover in this course) is an extension of the general linear model. In many respects, ANOVA and regression are conceptually identical---whereas in linear regression our predictor variables are typically continuous (or, in some cases ordinal) we usually reserve the term ANOVA for instances when our predictors are discrete or nominal (although it really need not be). This would be the difference say in predicting weight as a function of height (linear regression) in contrast to weight as function of hometown (Dayton, Youngstown, Cleveland, Cincinnati). Given that the assigned readings (and the optional Winter text) do a wonderful job of explaining the underlying principles of ANOVA, I won't spend too much time here rehashing what is already available there. Both the Flora text and the Winter text, especially does an excellent job of demonstrating how even though regression and ANOVA are often treated differently in terms of research focus (e.g., observation v. experimentation) and data focus (correlation/goodness of fit v. comparing means) they are indeed one and the same. Here, my goal is to reinforce this idea using examples in `R`, as well as providing a practical tutorial that will serve as our entry point into ANOVA.
+This week we cover **ANOVA**. A major emphasis in the material (especially Winter's optional text) is that ANOVA (much like many of the other tests that we cover in this course) is an extension of the general linear model. In many respects, ANOVA and regression are conceptually identical---whereas in linear regression our predictor variables are typically continuous (or, in some cases ordinal) we usually reserve the term ANOVA for instances when our predictors are discrete or nominal (although it really need not be). This would be the difference say in predicting weight as a function of height (linear regression) in contrast to weight as function of hometown (Dayton, Youngstown, Cleveland, Cincinnati). Given that the assigned readings (and the optional Winter text) do a wonderful job of explaining the underlying principles of ANOVA, I won't spend too much time here rehashing what is already available there. Both the optional Flora text and the Winter text, especially do an excellent job of demonstrating how even though regression and ANOVA are often treated differently in terms of research focus (e.g., observation v. experimentation) and data focus (correlation/goodness of fit v. comparing means) they are indeed one and the same. Here, my goal is to reinforce this idea using examples in `R`, as well as providing a practical tutorial that will serve as our entry point into ANOVA.
 
 We typically understand ANOVA as a method for allowing us to compare means from more than two samples. To see how this connects with what we have learned from regression lets use an example dataset. Before proceeding, this walk-through assumes that you have the following packages installed and loaded in R:
 
@@ -73,20 +73,51 @@ As we can see the data is number coded. In this case,
 
 My advice for what to do if you get dummy coded data is to create a corresponding column in your data set that contains the factors in nominal (name) format.
 
-Recall from previous weeks that we can use the `recode()` and `recode_factor()`functions to reassign the number variables. Here, we are recoding the levels of a factor, so the preferred function is `recode_factor()`. When we `recode_factor()` we have the added benefit of automatically *factorizing*, telling `R` to treat the IV as a factor. Let's create a new column `dataset$GROUP_FACTOR` that contains this data:
+Recall from previous weeks that we can use the `recode()` and `recode_factor()` functions to reassign the number variables. Here, we are recoding the levels of a factor, so the preferred function is `recode_factor()`. When we `recode_factor()` we have the added benefit of automatically *factorizing*, telling `R` to treat the IV as a factor. Let's create a new column `dataset$GROUP_FACTOR` that contains this data:
 
 ```{r renaming dummy codes}
 # assigning the appropriate names for the dummy codes
-dataset <- dataset %>% 
-  mutate(GROUP_FACTOR = dplyr::recode_factor(GROUP, 
-                                             "1" = "Counting",
-                                             "2"="Rhyming",
-                                             "3"="Adjective",
-                                             "4"="Imagery",
-                                             "5"="Intentional"
-                                             )
+dataset <- 
+  dataset %>% 
+  mutate(GROUP_FACTOR = fct_recode(factor(GROUP), 
+                                 Counting = "1",
+                                 Rhyming = "2",
+                                 Adjective = "3",
+                                 Imagery = "4",
+                                 Intentional = "5"
+                                 )
   )
 ```
+
+**Level-up**
+
+In this example, there is an implicit ordering where we assume `1 (Counting)` is the least level of processing and `5 (Intentional) is the highest. However at the moment this ordering is not taken into consideration by `R`. For example, let's say I wanted to consider levels of processing greater than Rhyming. If I wanted to only incude these levels in my data frame, I might:
+
+```{r}
+dataset %>%
+  filter(GROUP_FACTOR > "Rhyming")
+```
+but as you can see this does not give me the intended outcome.
+
+In order to fix this I can submit my labeled data to a second mutation:
+
+```{r}
+dataset <- 
+  dataset %>% 
+  mutate(GROUP_FACTOR_ORDERED = factor(GROUP_FACTOR, ordered = T)
+  )
+
+dataset
+```
+
+You'll notice that the new `GROUP_FACTOR_ORDERED` column contains the heading `<ord>`. And now:
+
+```{r}
+dataset %>%
+  filter(GROUP_FACTOR_ORDERED > "Rhyming")
+```
+
+FWIW there is a question of whether this is truly appropriate given the analysis, BUT let's for a moment assume that we wanted to perserve the ordinal nature of the data, this is how you would do so.
 
 ### Renaming column headers (optional)
 

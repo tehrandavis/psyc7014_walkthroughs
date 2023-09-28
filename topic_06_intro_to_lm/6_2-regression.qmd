@@ -76,7 +76,7 @@ performance::check_normality(stress_symptoms_model)
 For heteroskedastisticity, since `Stress` is a continuous predictor, we use the Breusch–Pagan test via `performance::check_heteroskedasticity()`:
 
 ```{r eval=FALSE}
-performance::check_heteroskedasticity(stress_symptoms_model, )
+performance::check_heteroskedasticity(stress_symptoms_model)
 ```
 
 Taken together, or visuals and our quantitative tests suggest we are okay.

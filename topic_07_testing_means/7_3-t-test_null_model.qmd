@@ -19,7 +19,7 @@ The second is how we typically see the null hypothesis expressed mathematically.
 
 ## The example of an $H_0$ distribution
 
-As an example, let's imagine the we have the population **`ohio_population`** of 10 million people (6e06 in scientific notation, or a 6 followed by 6 zeroes) with a true mean score of 50 and a standard deviation of 5.
+As an example, let's imagine the we have the population **`ohio_population`** of 10 million people (10e06 in scientific notation, or a 10 followed by 6 zeroes) with a true mean score of 50 and a standard deviation of 5.
 
 ```{r}
 ohio_population_null <- rnorm(10e06, mean = 50, sd = 5)
@@ -52,7 +52,7 @@ mean(control_group) - mean(experimental_group)
 
 Pretty close to zero.
 
-In fact, image that I did this 1000 times, getting the difference between my two means:
+In fact, imagine that I did this 1000 times, getting the difference between my two means:
 
 ```{r}
 null_simulations <- tibble(simulation = 1:1000) %>% 
@@ -93,7 +93,7 @@ ohio_population_alt <- c(threat_pop, control_pop)
 mean(ohio_population_alt)
 ```
 
-You'll note here that this alternative **`ohio_population`** has roughly the same mean as in the previous example (about 50), but peering in we see that the scores notatbly bimodal.
+You'll note here that this alternative **`ohio_population_alt`** has roughly the same mean as in the previous example (about 50), but peering in we see that the scores notatbly bimodal.
 
 ```{r}
 ggplot() + aes(ohio_population_alt)+ geom_histogram(binwidth=1, colour="black", fill="grey") + theme_cowplot()
@@ -141,7 +141,7 @@ tibble(mean_null_pop = mean(ohio_population_null),
   pander()
 ```
 
-However, in the first example, were the null hypothesis was indeed true, we pulled everyone from the same population... sort of like saying there really is no difference between those under threat and those that are not (control). In the second example, this was not true! In fact if we take a look at our group means from each example we see that while control and experimental are nearly identical from example 1, they are very different in example 2 (this is just reiterating what the histograms and difference scores told us above)
+However, in the first example, where the null hypothesis was indeed true, we pulled everyone from the same population... sort of like saying there really is no difference between those under threat and those that are not (control). In the second example, this was not true! In fact if we take a look at our group means from each example we see that while control and experimental are nearly identical from example 1, they are very different in example 2 (this is just reiterating what the histograms and difference scores told us above)
 
 ```{r}
 tibble(null_cont_mean = mean(null_simulations$control_group_mean),

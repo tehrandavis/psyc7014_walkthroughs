@@ -178,6 +178,5 @@ Turning out attention to the $t$ value associated for **namedGroupThreat**, this
 t.test(Score~namedGroup, data = stereotype_data, var.equal = T)
 ```
 
-This $t$ value is also the square-root of the $F$-value obtained in the model analysis of variance.
+This $t$ value is also the square-root of the $F$-value obtained in the model analysis of variance. Meaning that the $t$-value is an expression of the ratio of residual variance between the null model and the group (predictor) model. We typically don't talk about the $t$-test in this way, BUT this becomes central in how we assess differences between 3 or more means as in ANOVA. We'll expand on this idea when we discuss ANOVA, but for now it was easier to introduce when only considering two means.
 
-Looking forward, everything we've said in the last two walkthroughs apply to when we get to ANOVA as well.

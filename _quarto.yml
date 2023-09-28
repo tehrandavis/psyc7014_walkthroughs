@@ -1,6 +1,6 @@
 project:
   type: book
-  output-dir: _book
+  output-dir: /Users/davtj/personal_website/courses/statistics
 
   resources: 
     - "images/"

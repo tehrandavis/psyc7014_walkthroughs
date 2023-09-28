@@ -69,13 +69,13 @@ stereotype_data
 
 ### Checking our assumptions
 
-Remember that you should always test to see if the data fit the assumptions of the test you intend to perform. In this case, we need to assess two things: homogeneity of variance and normality. Unfortunatley, the performance package does **not** work for the commonly used $t$-test functions. (Although there is a caveat we will discuss later in this weeks walkthroughs). So, we'll have to check our assumptions the old fashioned way. Here we will focus on the normailty assumption and the homogeneity assumption.
+Remember that you should always test to see if the data fit the assumptions of the test you intend to perform. In this case, we need to assess two things: homogeneity of variance and normality. Unfortunatley, the `performance` package does **not** work for the commonly used $t$-test functions. So, we'll have to check our assumptions the old fashioned way. Here we will focus on the normailty assumption and the homogeneity assumption.
 
 #### normality
 
 No being able to use the performance package makes checking for normality a bit of a pain. Essentially, we need to split our two groups and run the requisite checks on each. I'll show you how to do this step by step, before showing you how you can leverage some of the skills you picked up using DataCamp to make this a little less of a pain.
 
-##### set-by-step (lomg way)
+##### set-by-step (long way)
 
 First let's split our two groups
 ```{r}

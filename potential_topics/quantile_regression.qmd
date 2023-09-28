@@ -1,0 +1,2 @@
+[Quantile Regression as The Most Useful Alternative for Ordinary Linear Regression](https://www.youtube.com/watch?v=Gtz8ca_4hVg)
+

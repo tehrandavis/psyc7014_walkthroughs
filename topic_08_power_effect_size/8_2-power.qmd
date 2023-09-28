@@ -6,9 +6,12 @@ title: 'Power'
 pacman::p_load(tidyverse, cowplot, glue)
 ```
 
-**I guess every superhero needs his theme music**
+**
+Screams from the haters, got a nice ring to it
+I guess every superhero need his theme music
+**
 
-Power is the answer to the second question for the previous section: "How strong would a potential treatment effect in a future experiment need to be in order for us to detect it?" More precisely it is the likelihood that a study will detect an effect when there is an effect. Mathematically we can express power as $1 - \beta$, where $\beta$ = Type II error (Cohen, 1962, 1988, 1992). Below is a visual representation of power.
+**Power** is the answer to the second question for the previous section: "How strong would a potential treatment effect in a future experiment need to be in order for us to detect it?" More precisely it is the likelihood that a study will detect an effect when there is an effect. Mathematically we can express power as $1 - \beta$, where $\beta$ = Type II error (Cohen, 1962, 1988, 1992). Below is a visual representation of power.
 
 ```{r, echo=FALSE, fig.width=6.25,fig.height=3.0}
 m1 <- 0  # mu H0
@@ -122,13 +125,13 @@ In statistical terms these are:
 2.  your sample size
 3.  your $\alpha$ (alpha) value (e.g, $p<.05$)
 
-As experimenters, we can manipulate any of these 3 components to increase the power of our design, though due to practical or theoretical constraints tend to focus on sample size and alpha value. Assuming that we allow effect size to remain constant (that is we don't try to enhance or exaggerate the effect, see the Cohen textbook for examples) we can calculate power as such:
+As experimenters, we can manipulate any of these 3 components to increase the power of our design, though due to practical or theoretical constraints tend to focus on sample size and alpha value. Assuming that we allow effect size to remain constant (that is we don't try to enhance or exaggerate the effect) we can calculate power as such:
 
 **Calculating a priori Power** Involves setting a specific likelihood (power = .80) at given $\alpha$ level (.05), given a known effect size. This is typically used to estimate the sample size needed to achieve that power (i.e., how much of a signal boost do we need). A key problem here is determining the proper effect size? One suggestion is to survey the literature for independent experiments and meta-analyses and use their results as a guide. BUT, one important thing to consider is that due to publication bias, those results are likely to be overestimates (only effects that are significant are reported, see Kicinski et al., 2015). Some other rules of thumb, assume your effect is small-to-medium (d = .3 or .4).
 
 **Post-hoc Power** is estimated given the *observed* effect size you found from your study, the sample size and $\alpha$ you set. As I mentioned post-hoc power doesn't really have much value. See [here](http://daniellakens.blogspot.com/2014/12/observed-power-and-what-to-do-if-your.html) for a more detailed discussion.
 
-## Estimating A priori Power
+## Estimating a priori Power
 
 Here we aim to ensure a specific likelihood that we will find a significant effect ($1-\beta$). There are two likelihood values that are often chosen for power: .8 and .95. 80% power is the value suggested by Cohen because it's economical. 95% is called high power, and it has been favored of late (but its very expensive and you will see why). To calculate power, we need 3 pieces of information. 1) Effect size (in Cohen's $d$), 2) your $\alpha$ level, and 3) a number of tails you want to set (usually 2-tailed).
 
@@ -224,9 +227,12 @@ In a similar vein we address this question: what is the smallest effect size tha
 Again using `pwr.t.test`, setting our desired power at .80 and leaving `d` NULL:
 
 ```{r}
+pacman::p_load(pwr)
 pwr.t.test(n = 100, d = NULL, power = .8, sig.level = 0.05,
                type = c("paired"), alternative = c("two.sided"))
 ```
+
+Given these criteria, I should be able to detect an effect as small as $d$ = 0.28.
 
 ## Regression example
 
