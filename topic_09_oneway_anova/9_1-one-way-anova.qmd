@@ -12,7 +12,7 @@ We typically understand ANOVA as a method for allowing us to compare means from 
 pacman::p_load(car,
                cowplot, 
                tidyverse,
-               psych)
+               rstatix)
 ```
 
 ## The data
@@ -29,7 +29,7 @@ We can download this `dataset` using the following code:
 dataset <- read_delim("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Ex11-1.dat", 
                       delim = "\t")
 
-show(dataset)
+dataset
 ```
 
 ## Getting the data in order
@@ -42,10 +42,10 @@ Depending on what statistical software you use, including a Participant ID colum
 
 \*\* I grant that it might be useful to use you Excel ninja skills here and get everything in its right place before importing, but will assume that you want to stay in an `R` environment.
 
-In this case, our data is in long format and we have a between subjects design. That is every line represents a single measure of a participant and every participant is represented only once. In this case we can just assign a unique number to each participant / row. In most cases this is a simple as assigning participant numbers {1,2,3...n}. An easy way to do this is to use the `seq_along()` function. The `seq_along()` function simply says to create numbers in sequence that match along a vector. In this case we can `seq_along` the `GROUP` column (vector).
+In this case, our data is in long format and we have a between subjects design. That is every line represents a single measure of a participant and every participant is represented only once. In this case we can just assign a unique number to each participant / row. In most cases this is a simple as assigning participant numbers {1,2,3...n}. An easy way to do this is to use the `row_number()` function. The `row_number()` function simply says to create numbers in sequence corresponding to the rows in your table.
 
 ```{r}
-dataset <- dataset %>% mutate(PartID = seq_along(dataset$GROUP))
+dataset <- dataset %>% mutate(PartID = row_number())
 dataset
 ```
 
@@ -53,6 +53,7 @@ FWIW, if you have the same compulsion that I do and insist that your `PartID` co
 
 ```{r}
 dataset <- dataset %>% select(PartID, everything())
+dataset %>% head()
 ```
 
 OK. That's addressed. Now onto issue #2.
@@ -73,7 +74,7 @@ As we can see the data is number coded. In this case,
 
 My advice for what to do if you get dummy coded data is to create a corresponding column in your data set that contains the factors in nominal (name) format.
 
-Recall from previous weeks that we can use the `recode()` and `recode_factor()` functions to reassign the number variables. Here, we are recoding the levels of a factor, so the preferred function is `recode_factor()`. When we `recode_factor()` we have the added benefit of automatically *factorizing*, telling `R` to treat the IV as a factor. Let's create a new column `dataset$GROUP_FACTOR` that contains this data:
+We can use the `fct_recode()` function to reassign the number variables into categorical names. Importantly, if your data is numerically coded you would need to convert it into a factor before applying the function. Notice in the code below I am applying the `as.factor()` function to `GROUP` within the `fct_recode` call:
 
 ```{r renaming dummy codes}
 # assigning the appropriate names for the dummy codes
@@ -87,37 +88,11 @@ dataset <-
                                  Intentional = "5"
                                  )
   )
+
+head(dataset)
 ```
 
-**Level-up**
-
-In this example, there is an implicit ordering where we assume `1 (Counting)` is the least level of processing and `5 (Intentional) is the highest. However at the moment this ordering is not taken into consideration by `R`. For example, let's say I wanted to consider levels of processing greater than Rhyming. If I wanted to only incude these levels in my data frame, I might:
-
-```{r}
-dataset %>%
-  filter(GROUP_FACTOR > "Rhyming")
-```
-but as you can see this does not give me the intended outcome.
-
-In order to fix this I can submit my labeled data to a second mutation:
-
-```{r}
-dataset <- 
-  dataset %>% 
-  mutate(GROUP_FACTOR_ORDERED = factor(GROUP_FACTOR, ordered = T)
-  )
-
-dataset
-```
-
-You'll notice that the new `GROUP_FACTOR_ORDERED` column contains the heading `<ord>`. And now:
-
-```{r}
-dataset %>%
-  filter(GROUP_FACTOR_ORDERED > "Rhyming")
-```
-
-FWIW there is a question of whether this is truly appropriate given the analysis, BUT let's for a moment assume that we wanted to perserve the ordinal nature of the data, this is how you would do so.
+I now have a column of data that treats my originally numerically coded IVs as factors. This is important as it will allow me to use the `GROUP_FACTOR` column as a predictor in my model.
 
 ### Renaming column headers (optional)
 
@@ -125,14 +100,15 @@ And now, just to be clear, let's rename the original `GROUP` to `GROUP_NUM`. Thi
 
 ```{r}
 # The template is rename(NEW_NAME = OLD_NAME)
-dataset <- dataset %>% dplyr::rename(GROUP_NUM = GROUP)
+dataset <- dataset %>% rename(GROUP_NUM = GROUP)
+dataset
 ```
 
 [Check out this link](https://www.datanovia.com/en/lessons/rename-data-frame-columns-in-r/#renaming-columns-with-dplyrrename) for info on how to rename multiple columns at once using `names()` or `dplyr::rename()` from the `tidyverse`.
 
 ### Reordering your levels
 
-One important question you should ask before you look at your data is "what is your **control** (group, condition)". Proper experimentation requires a proper control in order to properly isolate the influence of the manipulation (that's a lot of propers). Here, the best candidates for our control group might either be "Counting" or "Intentional", depending on how the original problem was approached. If the larger comparison involved "Intentional v. incidental" learning for recall, then the "Intentional" group serves best as your control. If the original question involved levels of processing, then "Counting"" (theoretically the lowest level of incidental processing) is best. Here I am assuming the latter (although I believe theoretically Eysenck originally was interested in the former).
+One important question you should ask before you look at your data is "what is your **control** (group, condition)". Proper experimentation requires a proper control in order to properly isolate the influence of the manipulation (that's a lot of "proper"s). Here, the best candidates for our control group might either be "Counting" or "Intentional", depending on how the original problem was approached. If the larger comparison involved "Intentional v. incidental" learning for recall, then the "Intentional" group serves best as your control. If the original question involved levels of processing, then "Counting"" (theoretically the lowest level of incidental processing) is best. Here I am assuming the latter (although I believe theoretically Eysenck originally was interested in the former).
 
 I bring this up, as its typically best to ensure that your control is entered first into the ANOVA model. To check the order of your levels, you may simply:
 
@@ -147,7 +123,8 @@ Assuming that we wanted to reorder the sequence, say to have `Intentional` as th
 ```{r re-levling}
 dataset <- dataset %>% 
   mutate(GROUP_FACTOR = fct_relevel(GROUP_FACTOR, "Intentional"))
-                              
+
+# rechecking the order of the levels
 levels(dataset$GROUP_FACTOR)
 ```
 
@@ -177,47 +154,40 @@ One last little bit of ninja-ing. If you wanted to save a particular `R` object 
 write_rds(dataset,'clean_dataset.rds')
 ```
 
+Alternatively, if I wan't to save it as something I can look at outside of `R` I can use `write.csv()`:
+
+```{r}
+write.csv(dataset,'clean_dataset.csv')
+```
+
 Onward to the analysis!!!!
 
 ## Assumptions for ANOVA
 
 ### Checking the normality assumption, OPTION 1 raw data by group
 
-To check the distribution of outcomes in ANOVA, you have two options. The first would be to check the distribution of outcomes for EACH group/condition independently. In the case of the example `dataset` we could get info related to the skew and kurtosis of RECALL for each GROUP_FACTOR using `describeBy()`:
+To check the distribution of outcomes in ANOVA, you have two options. The first would be to check the distribution of outcomes for EACH group/condition independently. In the case of the example `dataset` we could get info related to the skew and kurtosis of RECALL for each GROUP_FACTOR using some of the `dplyr` functions you learned in DataCamp:
 
 ```{r}
-psych::describeBy(dataset,group = dataset$GROUP_FACTOR)
+dataset %>% 
+  group_by(GROUP_FACTOR) %>% 
+  summarise(
+    skew = psych::skew(RECALL),
+    kurt = psych::kurtosi(RECALL)
+  )
 ```
-
-If we wanted to perform for extensive methods like `hist()`, `qqPlot()`, and `shapiro.test()`, in the past I had you filter be each level (group) and proceed. So for example for `Counting`:
+If we wanted to perform more extensive methods like the shapiro test, we could also use this method:
 
 ```{r}
-countingGroup <- filter(dataset,GROUP_FACTOR=="Counting")
-
-hist(countingGroup$RECALL)
-qqPlot(countingGroup$RECALL)
-shapiro.test(countingGroup$RECALL)
+dataset %>% 
+  group_by(GROUP_FACTOR) %>% 
+  rstatix::shapiro_test(RECALL)
 ```
-
-In the past you would have to repeat this for each other level. An alternative to generate an output by each level of a factor is to use the `by()` function. For example to generate a sequence of `qqPlot`s (for the sake of space I'm not going to execute this code here, but try on your computer)
-
-```{r eval=FALSE}
-# by(dependent variable, grouping factor, name of function)
-by(dataset$RECALL,INDICES = dataset$GROUP_FACTOR,qqPlot)
-```
-
-You can do the same with `hist()` and `shapiro.test()`
-
-```{r}
-by(dataset$RECALL,INDICES = dataset$GROUP_FACTOR,hist)
-by(dataset$RECALL,INDICES = dataset$GROUP_FACTOR,shapiro.test)
-```
-
-and even our custom standardized skew and kurtosis functions.
+BUT, this is a lot of work. And it's not very efficient. So let's look at the second option.
 
 ### Checking the normality assumption, OPTION 2, the better way: Look at the residuals.
 
-Although `by()` may or may not make life easier for you in this test case, things rapidly become more complicated when attempting to check normality by condition. For example if you're running a 2×3×3 mixed effect ANOVA, you would need to run through 18 conditions!!! So what to do?!?!?!
+Although `group_by()` may or may not make life easier for you in this test case, things rapidly become more complicated when attempting to check normality by condition. For example if you're running a 2×3×3 mixed effect ANOVA, you would need to run through 18 conditions!!! So what to do?!?!?!
 
 A simpler alternative is to run you model and analyze your residuals. [This web link](https://www.theanalysisfactor.com/checking-normality-anova-model/) does a nice and quick job of explaining the logic.
 
@@ -227,30 +197,25 @@ In this case we would run our ANOVA model using `lm` (see told you its all the s
 dataset_aov <- lm(RECALL~GROUP_FACTOR, data=dataset)
 ```
 
-Congrats, you've just run an ANOVA, but for now we aren't interested in the results from the model. Remember from a few weeks back that many outputs have `attributes` that may be accessed. In this case, we want the models residuals. These can be accessed by
-
-```{r}
-resid(dataset_aov)
-```
-
-From here, we can simply take the residuals (as we did with regression) and submit them to our standard tests for normality. For example, testing skew, and kurtosis:
-
-```{r}
-resid(dataset_aov) %>% skew()
-resid(dataset_aov) %>% kurtosi()
-```
-
-or submit the entire model diagnostic plots:
+Congrats, you've just run an ANOVA, but for now we aren't interested in the results from the model. Remember from a few weeks back we noted that we can use the `performance` package to check the overall model assumptions (including normality)
 
 ```{r}
 pacman::p_load(performance)
-
 performance::check_model(dataset_aov)
 ```
 
-**So, between OPTION 1 and OPTION 2, I'd recommend typically going with OPTION 2. Especially as your ANOVA designs become more complex.**
+And for the more explicit normality tests:
 
-#### WALKTHROUGH PROBLEM: Run the requisite tests for normality using the `residuals` from `dataset_aov`
+```{r}
+performance::check_normality(dataset_aov)
+
+# if we wanted to focus on the qqplot:
+performance::check_normality(dataset_aov) %>% plot("qq")
+```
+
+
+**So, between OPTION 1 and OPTION 2, I'd recommend typically going with OPTION 2. Especially as your ANOVA designs become more complex.**
+`
 
 ### Homogeneity of Variance
 
@@ -266,16 +231,25 @@ Huge differences in the IQR regions may be a clue that the homogeneity assumptio
 As is typically the case $p<.05$ indicates a violation of this assumption:
 
 ```{r}
-# Levene Test of Homogeneity of Variances
-car::leveneTest(RECALL~GROUP_FACTOR, data=dataset)
+# Bartlet Test of Homogeneity of Variances
+performance::check_homogeneity(dataset_aov)
 
 # Fligner-Killeen Test of Homogeneity of Variances
-fligner.test(RECALL~GROUP_FACTOR, data=dataset)
+performance::check_homogeneity(dataset_aov, method = "fligner")
 ```
 
 ### What to do if the assumptions are violated?
 
-If either assumption is violated, one option that you have is to transform you data. We've talked several times in class about the pros and cons of doing this, and there are several resources that provide examples of how this is done. Another option is to use a non-parametric test such as the Kruskal-Wallis Test if the data is not normal, or Welch's ANOVA is the variances are not homogeneous. That said, one of reasons that ANOVA is so popular is that it has been demonstrated to be robust in the face of violated assumptions (as long as the sample sizes are equal). For example, in *Design and Analysis of Experiments* (1999, p. 112) Dean & Voss argue that the maximum group variance may be as high as 3× the minimum group variance without any issue. With this in mind, a question (gray area) before us is *how much* of a violation is there in the data? And if not so much, you may be fine just running an ANOVA regardless.
+If either assumption is violated, one option that you have is to transform you data. We've talked several times in class about the pros and cons of doing this, and there are several resources that provide examples of how this is done. Another option is to use a non-parametric test such as the Kruskal-Wallis Test if the data is not normal, or Welch's ANOVA is the variances are not homogeneous. That said, one of reasons that ANOVA is so popular is that it has been demonstrated to be robust in the face of violated assumptions (as long as the sample sizes are equal). For example, in *Design and Analysis of Experiments* (1999, p. 112) Dean & Voss argue that the maximum group variance may be as high as 3× the minimum group variance without any issue. With this in mind, a question (gray area) before us is *how much* of a violation is there in the data? And if not so much, you may be fine just running an ANOVA regardless. Let's check the variance of the groups in our example:
+
+```{r}
+dataset %>% 
+  group_by(GROUP_FACTOR) %>% 
+  summarise(
+    var = var(RECALL)
+  )
+```
+Looks like in this example, we may still have an issue. For now I'm going to ignore it, but you should be aware that this is a potential issue.
 
 ## Running the ANOVA in R using `aov()` or `lm()`
 
@@ -294,19 +268,22 @@ anova(aov.model)
 car::Anova(aov.model, type="3")
 ```
 
-Also note that we can get `residuals` from the `aov()` output as well. In fact take a look at the object's `$class`... see I told you, `lm()`!!!
+We can also get our effect sizes from the `aov.model` using `eta_squared()` from the `rstatix` package. Note that this is the same as the $\eta^2$ value from the ANOVA table above.
 
 ```{r}
-resid(aov.model)
+rstatix::eta_squared(aov.model)
 ```
 
-Even better, a more comprehensive anova table can be obtained by submitting our `aov.model` to `sjstats::anova_stats()`, which gives us our effect sizes as well! This function calculates eta-squared ($\eta^2$), partial-eta-squared ($\eta_p^2$), omega squared ($\omega^2$) and partial omega-squared ($\omega_p^2$) as well as Cohen's *f*. Typically for One-Way ANOVA psychologists report eta-squared ($\eta^2$), though there are arguments that omega squared ($\omega^2$) may be the more preferred measure. Note that pander is for web formatting this page.
+FWIW... a super-duper comprehensive anova table can be obtained by submitting our `aov.model` to `sjstats::anova_stats()`, which gives us our effect sizes as well! This function calculates eta-squared ($\eta^2$), partial-eta-squared ($\eta_p^2$), omega squared ($\omega^2$) and partial omega-squared ($\omega_p^2$) as well as Cohen's *f*. Typically for One-Way ANOVA psychologists report eta-squared ($\eta^2$), though there are arguments that omega squared ($\omega^2$) may be the more preferred measure. 
 
 ```{r}
-pacman::p_load(pander)
+pacman::p_load(kableExtra)
 pacman::p_load(sjstats)
-sjstats::anova_stats(aov.model) %>% pander()
+sjstats::anova_stats(aov.model) %>% 
+  kbl(caption = "Super ANOVA table") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
 ```
+
 
 ## Plotting your data
 
@@ -344,15 +321,15 @@ p <- ggplot2::ggplot(data =dataset,mapping = aes(x = GROUP_FACTOR, y = RECALL)) 
 show(p)
 ```
 
-Finally, for aesthetic reasons you may elect to expand the y-axis. For example to make the range of y-axis values (0,20):
+Finally, for aesthetic reasons you may elect to expand the y-axis. For example to make the range of y-axis values (0,20) and use `cowplot::theme_cowplot()` to make the plot look a little more APA friendly.
 
 ```{r}
-p + expand_limits(y=c(0,20))
+pacman::p_load(cowplot)
+p + expand_limits(y=c(0,20)) + theme_cowplot()
 ```
 
-That being said, this data probably lends itself to a bar plot. This is similar to how you built your bar plots from as when doing a t-test. As a matter of fact:
+That being said, this data probably lends itself to a bar plot. This is similar to how you built your bar plots from as when doing a t-test. As a matter of fact, as practice why don't you give that a shot right now. I'll wait.
 
-#### WALKTHROUGH PROBLEM: Create a bar plot with error bars for our `dataset`.
 
 ## Reporting your data / the write up
 
@@ -385,7 +362,6 @@ As we've already mentioned (and spent time discussing in class) ANOVA is just an
 ```{r}
 lm.model <- lm(RECALL~GROUP_FACTOR, data=dataset)
 anova(lm.model)
-sjstats::anova_stats(lm.model) %>% pander()
 ```
 
 All `aov()` does is take an `lm` object and produce an ANOVA table from the results. If we were simply to look at the `lm() model` we see that it gives us the info in our ANOVA table at the end of the summary, including the `F-statistic` (9.085), the `degrees of freedom` (4 and 45) and the `p-value` (1.815e-05):
@@ -424,10 +400,8 @@ Given our example:
 -   words RECALL is our dependent measure
 -   GROUP_FACTOR is our independent variable, with five levels (or groups).
 
-Using sjstats to generate an ANOVA table (pander makes it pretty for this web page:
-
 ```{r}
-sjstats::anova_stats(aov.model) %>% pander()
+anova(aov.model)
 ```
 
 From this table, we need our:
@@ -435,7 +409,13 @@ From this table, we need our:
 -   **df**: 4 and 45
 -   **F-statistic**: 9.085
 -   **p.value**: even though it says zero, its "\<.001"
--   **etasq**: .447; the symbol for etasq is $\eta^2$
+
+And we can also get our effect size:
+
+```{r}
+rstatix::eta_squared(aov.model)
+```
+
 
 Taking all of this info, and plugging into a write-up template (inserted points in bold):
 
@@ -452,20 +432,14 @@ aov_model_lm <- lm(RECALL~GROUP_FACTOR, data = dataset)
 summary(aov_model_lm)
 ```
 
-From this summary output we would not only extract our `F-statistic`, `df`, `p-value` and `R-squared` (remember that $R^2$ is $\eta^2$) as we do for the previous write-up, but now we can talk about differences between the other levels and `Counting` as expressed as a `t` value (we are running t-tests). We then combine this info with info related to the means and standard errors (note that I got the means and ses by creating a summary `tibble():`
+From this summary output we would not only extract our `F-statistic`, `df`, `p-value` and `R-squared` (remember that $R^2$ is $\eta^2$) as we do for the previous write-up, but now we can talk about differences between the other levels and `Counting` as expressed as a `t` value (we are running t-tests). 
+
+In some cases you may want to also report the means of each of Groups. We then combine this info with info related to the means and standard errors:
 
 ```{r}
 dataset %>% 
   group_by(GROUP_FACTOR) %>%
-  summarise(mean = mean(RECALL) %>% round(2),
-            se = sd(RECALL)/sqrt(n()) # ses = sd / sqrt number of participants
-            ) %>% 
-  # this bit of code does some rounding (optional)
-  mutate_if(is.numeric,
-            round,
-            digits = 2)
-  
-
+  rstatix::get_summary_stats(RECALL, type = "mean_se")
 ```
 
 Putting all of this info together, we might say:

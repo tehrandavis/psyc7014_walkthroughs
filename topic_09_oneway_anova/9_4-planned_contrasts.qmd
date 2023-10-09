@@ -34,16 +34,24 @@ Example (run line-by-line):
 ```{r}
 # Preliminaries
 ## load in data
-dataset <- read_table2("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Tab12-1.dat")
+dataset <- read_table("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Tab12-1.dat")
 
 ## check data, identify columns
 dataset
 
 ## Group is numerically coded. Fixing this and turning to a factor
-dataset$Group <- recode_factor(dataset$Group, "1"="MS","2"="MM","3"="SS","4"="SM","5"="McM")
-
+dataset <- 
+  dataset %>% 
+  mutate(Group_fct = fct_recode(factor(Group), 
+                                MS = "1",
+                                MM = "2",
+                                SS = "3",
+                                SM = "4",
+                                McM = "5")
+  )
+  
 # Step 1: Check levels
-levels(dataset$Group)
+levels(dataset$Group_fct)
 
 # Step 2: build contrasts
 ## MS v. MM
@@ -57,10 +65,10 @@ my_contrasts <- list("MS v. MM" = contrast1,
                      )
 
 # Step 3
-morphine_mdl <- lm(Time~Group, data = dataset) 
+morphine_mdl <- lm(Time~Group_fct, data = dataset) 
 
 # Step 4
-emmeans(object = morphine_mdl,specs = ~Group, adjust="bonf") %>% 
+emmeans(object = morphine_mdl,specs = ~Group_fct, adjust="bonf") %>% 
   contrast(method = my_contrasts)
 ```
 
@@ -86,25 +94,31 @@ First let's load in the data and recode the factors:
 
 ```{r}
 ## load in data
-dataset <- read_table2("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Tab12-1.dat")
+dataset <- read_table("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Tab12-1.dat")
 
 ## Group is numerically coded. Fixing this and turning to a factor
-dataset$Group <- recode_factor(dataset$Group, "1"="MS","2"="MM","3"="SS","4"="SM","5"="McM")
-
-dataset
+dataset <- 
+  dataset %>% 
+  mutate(Group_fct = fct_recode(factor(Group), 
+                                MS = "1",
+                                MM = "2",
+                                SS = "3",
+                                SM = "4",
+                                McM = "5")
+  )
 ```
 
 Looking at Siegel's data we see that MS defaults as the control:
 
 ```{r}
 # Step 1: Check levels
-levels(dataset$Group)
+levels(dataset$Group_fct)
 ```
 
 We can check which contrasts any model we run will default to, by invoking `contrasts()`:
 
 ```{r}
-contrasts(dataset$Group)
+contrasts(dataset$Group_fct)
 ```
 
 These sorts of contrasts are known as treatment contrasts... measuring the effect of each treatment against a control. While there are several types of contrasts built into `R` we can create custom contrasts as well.
@@ -129,7 +143,7 @@ in R we can construct each of these contrasts like so:
 
 ```{r}
 # checking the order of groups:
-levels(dataset$Group)
+levels(dataset$Group_fct)
 
 # building contrasts
 
@@ -149,8 +163,8 @@ When performing planned contrasts in `R` I recommend using the `emmeans` package
 -   submit your `emmeans` object to the `contrasts()` function indicating what your contrasts are.
 
 ```{r}
-morphine_mdl <- lm(formula = Time~Group,data = dataset)
-emm_mdl <- emmeans(morphine_mdl,specs = ~Group)
+morphine_mdl <- lm(formula = Time~Group_fct,data = dataset)
+emm_mdl <- emmeans(morphine_mdl,specs = ~Group_fct)
 contrast(emm_mdl, method = list(contrast1))
 ```
 
@@ -177,7 +191,7 @@ contrast(emm_mdl,
 One thing you may have noticed above is that your contrasts aren't labeled very transparently. Looking at the output you would have to remember what was being contrasted in `contrast1` and `contrast2`. You can save yourself a little headache if you label your contrasts while constructing the matrix. Let's say I wanted to run these four contrasts based upon my levels:
 
 ```{r}
-levels(dataset$Group)
+levels(dataset$Group_fct)
 ```
 
 Now setting up my contrasts to match:
@@ -243,7 +257,7 @@ The functions `sigma()` and `df.residual()` allow us to get the relevant informa
 
 ```{r}
 # create and emmeans object specifying your factor
-emm_mdl <- emmeans(emm_mdl, specs = ~Group)
+emm_mdl <- emmeans(emm_mdl, specs = ~Group_fct)
 
 # specify your contrasts, this goes in the method call
 my_contrasts <- list("MM v. McM" = contrast1,

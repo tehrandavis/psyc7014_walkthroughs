@@ -6,8 +6,8 @@ Note that this week's vignette assumes you have the following packages:
 
 ```{r}
 pacman::p_load(emmeans,
-               ez, # get info on design of ANOVA, also can run ezANOVA
-               Rmisc, # getting summary data
+               ez, # get info on design of ANOVA
+               rstatix, # anova tables
                cowplot, 
                tidyverse)
 ```
@@ -34,12 +34,6 @@ For now, I want you focused on building intuitions about dealing with main effec
 ## load in data
 dataset <- read_csv("http://tehrandav.is/courses/statistics/practice_datasets/factorial_ANOVA_dataset_no_interactions.csv")
 
-## in this case, fixing IV columns...
-dataset$Lecture <- recode_factor(dataset$Lecture, "1"="Phys","2"="Soc","3"="Hist")
-
-dataset$Presentation <- recode_factor(dataset$Presentation, "1"="Comp","2"="Stand")
-
-
 # Step 1: create the additive ANOVA model
 # note that this is not a full factorial model, but what we are focusing on this week:
 aov_model <- lm(Score~Lecture + Presentation,data = dataset)
@@ -48,20 +42,14 @@ aov_model <- lm(Score~Lecture + Presentation,data = dataset)
 performance::check_model(aov_model)
 
 # Step 2b: check normality and homogeneity assumptions using tests:
-
-# test residuals of model for normality:
-aov_model %>% resid() %>% shapiro.test()
-
-# test homogeneity:
-# note we are using a test from the performance package due to (somewhat) artificial limitations of the instruction method (see below)
+aov_model %>% performance::check_normality()
 aov_model %>% performance::check_homogeneity()
 
 
 # Step 3: check the F-ratio for significance
 # note I'm only slecting columns from the anova table that are relevant to us:
 
-aov_model %>% sjstats::anova_stats() %>%
-  dplyr::select(c("term","df","statistic","p.value","partial.etasq"))
+aov_model %>% anova_test(effect.size = "ges")
 
 # Step 4: Post hoc analyses on main effects
 emmeans(aov_model, specs = pairwise~Lecture, adjust="tukey")
@@ -109,16 +97,16 @@ dataset <- read_delim("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Sec13-5.
 dataset
 ```
 
-Looking at this data, the first think that we need to do is recode the factors. Recall that we can do this using `recode_factor`...
+Looking at this data, the first think that we need to do is recode the factors. Recall that we can do this using `fct_recode`...
 
 ### Ninja-up
 
 As an alternative to `mutate()`, you can add a new column to a data frame by invoking `dataframe$new_column.` This saves us a bit of typing. Also, for weeks I've told you not to overwrite existing columns, and I maintain that is best practice for beginners. However, in this example we will overwrite.
 
 ```{r}
-dataset$Task <- recode_factor(dataset$Task, "1" = "Pattern Recognition", "2" = "Cognitive", "3" = "Driving Simulation") 
+dataset$Task <- fct_recode(factor(dataset$Task), "Pattern Recognition" = "1", "Cognitive" = "2", "Driving Simulation" = "3") 
 
-dataset$Smkgrp <- recode_factor(dataset$Smkgrp, "3" = "Nonsmoking", "2" = "Delayed", "1" = "Active")
+dataset$Smkgrp <- fct_recode(factor(dataset$Smkgrp), "Nonsmoking" = "3", "Delayed" = "2", "Active" = "1")
 ```
 
 To get a quick view of our data structure we can use two kinds of calls:
@@ -183,12 +171,12 @@ Let's go ahead and plot the data using a line plot with 95% CI error bars. Note 
 Interaction plots take into consideration the influence of each of the IVs on one another---in this case the mean and CI of each smoking group (Active v. Nonsmoking) as a function of Task (Driving Simulation v. Pattern Recognition). There is an additional consideration when plotting multiple predictors. That said, all we are doing is extending the plotting methods that you have been using for the past few weeks. The important addition here is the addition of `group=` in the first line the `ggplot`. For example:
 
 ```{r eval=FALSE}
-ggplot2::ggplot(data = dataset, mapping=aes(x=Smkgrp,y=score,group=Task))
+ggplot2::ggplot(data = dataset_2by2, mapping=aes(x=Smkgrp,y=score,group=Task))
 ```
 
 indicates that we are:
 
--   using the `dataset` data set
+-   using the `dataset_2by2` data set
 
 -   putting first IV, `Smkgrp`, on the x-axis
 
@@ -336,7 +324,11 @@ For now, let's focus on testing the main effects.
 
 Now we can run the using the `lm()` method as we have previously done with the One-way ANOVA. The new wrinkle is simply adding our additional IV terms to the the formula equation:
 
-$$y=IV_1+IV_2+...+IV_n$$ where the first and second terms capture our main effects and the third is our interaction.
+$$
+y=IV_1+IV_2+...+IV_n
+$$ 
+
+where the first and second terms capture our main effects and the third is our interaction.
 
 Using our data in `R` this formula becomes:
 
@@ -364,11 +356,9 @@ For our purposes this semester, the **Homogeneity of Variance** and **Normality 
 
 ### test for assessing normality
 
-If we want to check the normality of residuals we may use the **Shapiro-Wilkes Test**. We can call it directly using `shapiro.test()` or from the `performance` library. I show both methods below (you only need to choose ONE. In week's past you've been using the `shapiro.test()`:
+If we want to check the normality of residuals we may use the **Shapiro-Wilkes Test**. We can call it directly using from the `performance` library:
 
 ```{r}
-aov_model$residuals %>% shapiro.test()
-
 aov_model %>% performance::check_normality()
 ```
 
@@ -395,29 +385,23 @@ Our test says we have a violation (which is consistent with our visual inspectio
 
 ## Getting cell means and sd
 
-Up until this point we've used `psych::describeBy()` to generate summary stats. This becomes a little more difficult as the designs become more complex. Alternatively you might elect to build a data table yourself. You learned how to do this a few weeks ago using the summarise function:
+To get cell means and standard deviations we can use the `rstatix` package. This package has a function called `get_summary_stats()` that will provide us with the means and sd for each cell. To use this function we need to `group_by()` our data by our IVs. For example, to get the means and sd for each cell we would do the following:
+
 
 ```{r}
 dataset_2by2 %>% 
   group_by(Task, Smkgrp) %>%
-  summarise(mean = mean(score), # get group means
-            var = var(score)) # get group variances
+  rstatix::get_summary_stats(score)
 ```
 
-Another alternative, that I would recommend over the `psych` package is to use `summarySE()` from the `Rmisc` package:
-
-```{r}
-Rmisc::summarySE(data = dataset_2by2, # your dataset
-                 measurevar = "score", # your dv
-                 groupvars = c("Task","Smkgrp")) # your between-groups IV(s)
-```
 
 Recalling that we had an issue with heteroscadicity, we can now use the obtained `sd` values to assess whether our violation is too great. Let's save our summary table:
 
 ```{r}
-cell_summary_table <- Rmisc::summarySE(data = dataset_2by2, # your dataset
-                                       measurevar = "score", # your dv
-                                       groupvars = c("Task","Smkgrp"))
+cell_summary_table <- 
+  dataset_2by2 %>% 
+  group_by(Task, Smkgrp) %>%
+  rstatix::get_summary_stats(score)
 ```
 
 from this we can call the `sd` values and square them to get our variance:
@@ -433,16 +417,20 @@ Houston we have a problem! The largest variance there is definitely greater than
 
 We can also use this function to report the means related to the main effects (irrespective of interaction).
 
-For example, Smoking effect I can re-write the call above, simply dropping `Task` from `groupvars`:
+For example, Smoking effect I can re-write the call above, simply dropping `Task` from the `group_by():
 
 ```{r}
-Rmisc::summarySE(data = dataset_2by2,measurevar = "score",groupvars = "Smkgrp")
+dataset_2by2 %>% 
+  group_by(Smkgrp) %>%
+  rstatix::get_summary_stats(score)
 ```
 
 and for the Task effect:
 
 ```{r}
-Rmisc::summarySE(data = dataset_2by2,measurevar = "score",groupvars = "Task")
+dataset_2by2 %>% 
+  group_by(Task) %>%
+  rstatix::get_summary_stats(score)
 ```
 
 Note that If you are reporting means related to the main effects, you need to report these marginal means!
@@ -454,7 +442,7 @@ HOWEVER... this data has an interaction, and remember what I said above, if the 
 Ok. Now let's look at our ANOVA table. Note that instead of the full print out, I'm asking `sjstats` to only give me the values I'm interested in: the **term** (effect), **df**, (F) **statistic**, p-**value**, and effect size, in this case **partial.eta**
 
 ```{r}
-sjstats::anova_stats(aov_model) %>% select("term","df","statistic","p.value","partial.etasq")
+aov_model %>% anova_test(effect.size = "ges")
 ```
 
 You'll note that both main effects are significant, meaning that we would need to perform pairwise, post-hoc comparisions for each effect. **BUT** **you'll also note that each of our factors ONLY HAD TWO LEVELS, meaning that the F-test in the ANOVA table *IS* a pairwise comparison.** In cases like this, when the effect only has 2 levels, we are done (any post hoc analysis would be redundant).

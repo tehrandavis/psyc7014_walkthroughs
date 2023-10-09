@@ -227,6 +227,7 @@ Coincidentally you may have noticed that this $\beta$ value is the correlation t
 
 ```{r}
 cor(stress_data$Stress, stress_data$lnSymptoms)
+lm.beta(stress_symptoms_model) %>% summary()
 ```
 
 As explained by Barry Cohen (in his useful textbook that I didn't have you buy...):

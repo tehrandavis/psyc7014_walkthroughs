@@ -265,7 +265,7 @@ So what is known: we have 17 total participants from (hypothetically) the same p
 ```{r}
 t.test(Weight~Treatment, data=anorexia_data, paired=T)
 pacman::p_load(effectsize)
-effectsize::cohens_d(Weight~Treatment, data=anorexia_data, paired = T,correction = T)
+effectsize::cohens_d(Weight~Treatment, data=anorexia_data, correction = T)
 ```
 
 So on first pass we've got a null effect ($p>.05$) and our effect size is small (0.16). Let's image that instead of 17 participants we had 170:
@@ -277,7 +277,7 @@ anorexia_data_170 <- do.call("rbind", replicate(10, anorexia_data, simplify = FA
 ```{r}
 t.test(Weight~Treatment, data=anorexia_data_170, paired=T)
 pacman::p_load(effectsize)
-effectsize::cohens_d(Weight~Treatment, data=anorexia_data, paired = T,correction = T)
+effectsize::cohens_d(Weight~Treatment, data=anorexia_data, correction = TRUE) 
 ```
 
 We see our effect size remains unchanged, but now our test is significant!

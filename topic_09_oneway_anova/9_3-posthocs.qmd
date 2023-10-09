@@ -26,30 +26,44 @@ Example (I recommend running this line-by-line)
 ```{r}
 # Preliminaries
 ## load in data
-dataset <- read_table2("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Tab12-1.dat")
+dataset <- read_table("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Tab12-1.dat")
 
 # Step 1
 ## check data, identify columns
 dataset
 
 ## Group is numerically coded. Fixing this and turning to a factor
-dataset$Group <- recode_factor(dataset$Group, "1"="MS","2"="MM","3"="SS","4"="SM","5"="McM")
-
+dataset <- 
+  dataset %>% 
+  mutate(Group_fct = fct_recode(factor(Group), 
+                                MS = "1",
+                                MM = "2",
+                                SS = "3",
+                                SM = "4",
+                                McM = "5")
+  )
 # Step 2: Run the model
-model_aov <- lm(Time~Group, data = dataset)
+model_aov <- lm(Time~Group_fct, data = dataset)
 
 # Step 3: Test the model for significant F-value
-model_aov %>% sjstats::anova_stats()
+model_aov %>% anova()
 
-# Step 4: post-hoc analysis in this example "tukey", but could also be "bonf" or "holm"
-emmeans(object = model_aov,specs = ~Group, adjust="tukey") %>% pairs()
+# Step 4: Get the model effect size:
+model_aov %>% rstatix::eta_squared()
+
+# Step 5: post-hoc analysis in this example "tukey", but could also be "bonf" or "holm"
+emmeans(object = model_aov,
+        specs = pairwise~Group_fct, 
+        adjust="tukey")
 ```
 
-## Comparing means in the ANOVA model
+## Post hoc tests for ANOVA
 
-In AoV, part 1, introduced the One-Way ANOVA. ANOVA is useful when we are comparing 3 or more group means such that the null hypothesis is:
+In previous walkthroughs, we introduced the One-Way ANOVA. ANOVA is useful when we are comparing 3 or more group means such that the null hypothesis is:
 
-$$\mu_1=\mu_2=\mu_3...=\mu_n$$.
+$$
+\mu_1=\mu_2=\mu_3...=\mu_n
+$$
 
 In this case, if a single mean is revealed to be significantly different from the others, then the null is rejected. However, rejecting the null only tells us that at least one mean was different from the others; it does not tell us which one or how many. For example with just three means, it could be the case that:
 
@@ -64,16 +78,13 @@ Enter multiple contrasts. Multiple contrasts are a way of testing the potential 
 
 This vignette assumes that you have the following packages installed and loaded in R:
 
-```{r warning = FALSE, message=FALSE}
-
-# use pacman to check, install, and load necessary packages
+```{r message=FALSE, warning=FALSE, include=FALSE}
 pacman::p_load(agricolae,
                cowplot, 
                tidyverse, 
                emmeans,
-               multcomp,
                psych,
-               sjstats)
+               rstatix)
 ```
 
 ## The data: Siegel's 1975 study on the effects of morphine
@@ -82,19 +93,29 @@ To start, lets download Siegel's (1975) data set on Morphine Tolerance. This dat
 
 ```{r downloading the dataset}
 # grab data from online location:
-dataset <- read_table2("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Tab12-1.dat")
+dataset <- read_table("https://www.uvm.edu/~statdhtx/methods8/DataFiles/Tab12-1.dat")
 
 # convert dataset$Group number codes to named factor levels:
-dataset$Group <- recode_factor(dataset$Group, "1"="MS","2"="MM","3"="SS","4"="SM","5"="McM")
-
+dataset <- 
+  dataset %>% 
+  mutate(Group_fct = fct_recode(factor(Group), 
+                                MS = "1",
+                                MM = "2",
+                                SS = "3",
+                                SM = "4",
+                                McM = "5")
+  )
+  
 # get descriptive stats for this data by Group
-psych::describeBy(dataset$Time,dataset$Group)
+dataset %>%
+  group_by(Group_fct) %>%
+  get_summary_stats(Time, type = "mean_sd")
 ```
 
 And a quick peek at this data:
 
 ```{r}
-ggplot(data = dataset,aes(x=Group,y=Time)) +
+ggplot(data = dataset,aes(x=Group_fct,y=Time)) +
   stat_summary(fun = mean, geom = "bar") +
   stat_summary(fun.data = mean_se, geom = "errorbar", aes(width=.25)) +
   scale_y_continuous(expand = c(0,0)) + expand_limits(y=c(0,35)) + theme_cowplot()
@@ -102,24 +123,45 @@ ggplot(data = dataset,aes(x=Group,y=Time)) +
 
 ## Running the One-way ANOVA
 
-Now that our data is properly coded we can run our omnibus ANOVA. My own personal preference is to run the ANOVA using `lm()`. This makes like a lot easier when dealing with contrasts, especially if you decide to employ the method that Field suggests in his guide. FWIW, I typically use another method as seen below, but I'll talk a little bit about why I prefer it to Fields method. That said, recall from Part 1 that using the `aov()` function gives you the same result. Depending on which you choose, you can use the `summary(morphine_mdl)` or `anova(morphine_mdl)` to switch back and forth to get the info that you desire:
+Now that our data is properly coded we can run our omnibus ANOVA. My own personal preference is to run the ANOVA using `lm()`. This makes like a lot easier when dealing with contrasts, especially if you decide to employ the method that Field suggests in his guide. FWIW, I typically use another method as seen below, but I'll talk a little bit about why I prefer it to Fields method. That said, recall from Part 1 that using the `aov()` function gives you the same result. Depending on which you choose, you can use the `summary(morphine_mdl)` or `anova(morphine_mdl)` to switch back and forth to get the info that you desire. 
 
 ```{r}
 # running the ANOVA using lm:
-morphine_mdl <- lm(formula = Time~Group,data = dataset)
-# using the anova() function to display as ANOVA table
+morphine_mdl <- lm(formula = Time~Group_fct,data = dataset)
+
+# anova table
 anova(morphine_mdl)
-# full anova output (preferred)
+
+# get effect size
+rstatix::eta_squared(morphine_mdl)
+```
+
+
+So we see here that we have: $F(4,35)=27.33,p<.001,\eta^2=.76$
+
+### More complete anova tables
+
+FWIW, in the example above we ran one function for the anova table and another for the effect size. R has many packages that will combine the two of them for you, including the `sjstats` package. For example `sjstats::anova_stats()` will give you a nice table with the ANOVA and effect size information, BUT it's probably a little too comprehensive. It give you a lot of information that you may not need, but is good if you elect to report more exotic effect sizes (e.g., omega squared, epsilonsq, etc.):
+
+```{r}
 sjstats::anova_stats(morphine_mdl)
 ```
 
-So we see here that we have: $F(4,35)=27.33,p<.001,\eta_p^2=.75$
+For our purposes, `rstatix::anova_test()` provides a cleaner alternative. It gives you the ANOVA table, and effect sizes. It also gives you the option to specify the type of ANOVA that you want to run (e.g., Type II, Type III, etc., see Field text). For example:
+
+```{r}
+rstatix::anova_test(morphine_mdl, 
+                    effect.size = "ges", # general eta squared for one-way ANOVA
+                    type = 2) # type 2 is the default for R
+
+#FWIW type=3 is the default for SPSS, see ?rstatix::anova_test for more info
+```
 
 Remember again that the **only** thing that the omnibus ANOVA tells us is that there is an inequality in our means. In this respect, the omnibus begs more questions than it answers---which means are different from which. In order to get this answer we need to run direct comparisons between our means. There are two ways of going about this, we can either *(1)* plan beforehand what differences in means are especially relevant for us and focus on those, or *(2)* take a look at all potential differences without any specified predictions. In Case 1, we are performing **planned contrasts**; in Case 2, we use **post hoc** tests. More often than not, you will see researchers analyzing differences in means using post hoc tests---that is they run the ANOVA, find that it is significant, and run a battery of pairwise comparisons. It is sometimes the case that of that battery of comparisons, only a select few are actually theoretically relevant. However, if there is a theory-driven case to be made that you are predicting differences between a few select means in your data, then there is an argument to be made that you should run your planned contrasts independent of your ANOVA. That is, you are technically only permitted to run post-hoc tests if your ANOVA is significant (you can only go looking for differences in means if your ANOVA tells you that they exist), whereas planned contrasts can be run regardless of the outcome of the omnibus ANOVA (indeed, some argue that they obviate the need to run the omnibus ANOVA altogether).
 
 My guess is that most of you have experience with post-hoc tests. They are more commonly performed tend to be touched upon in introductory stats courses. So we will spend a little time on these first before proceeding to a more in depth treatment of planned contrasts.
 
-## Post-hoc tests
+## Post-hoc tests: what, why, and how
 
 **We use a post-hoc test when we want to test for differences in means that we have not explicitly predicted prior to conducting our experiment**. As a result, whenever we perform a post-hoc test, we need to adjust our critical p-values to correct for inflation of Type 1 error. Recall from earlier discussions that the odds of committing a Type 1 error (falsely rejecting the null) is $1-(1-\alpha)^c$ where $\alpha$ is you critical p-value and $c$ is the number of comparisons that are to be performed. Typically we keep this at .05, so when conducting a single test, the likelihood of committing a Type 1 error is: $1-(1-.05)^1=1-0.95^1=0.05$
 
@@ -137,8 +179,8 @@ So how many comparisons is relatively small? I'd suggest best form is to use the
 Plot:
 
 ```{r}
-ggplot(data = dataset,aes(x=Group,y=Time)) +
-  stat_summary(fun.y = mean, geom = "bar") +
+ggplot(data = dataset,aes(x=Group_fct,y=Time)) +
+  stat_summary(fun = mean, geom = "bar") +
   stat_summary(fun.data = mean_se, geom = "errorbar", aes(width=.25)) +
   scale_y_continuous(expand = c(0,0)) + expand_limits(y=c(0,35)) + 
   theme_cowplot()
@@ -152,13 +194,22 @@ In the case above there are $(5!)/(2!)(5-2)!$ = 10 combinations. If we were to r
 
 One final method that is becoming more *en vogue* is the Ryan, Einot, Gabriel, Welsch method (REGWQ). Whereas Tukey's method holds the critical $p$ constant for all comparisons (at the loss of power) the REGWQ allows for an adjustment for the number of comparisons. It is currently being promoted as the most desirable post-hoc method.
 
-### Bonferonni-Dunn and Holm tests
+In `R` there are several ways in which we can call post hoc corrections. They can loosely be broken down into methods that provide contrasts based on the raw data and methods that provide contrasts based upon the model. Because you are likely familiar with the former, we will start with raw-data based methods. However, I'll note that model-based methods are my perferred method and in many respect supercede their more simple raw-data cousing. 
 
-In `R` there are several ways in which we can call post hoc corrections. For example we can call the Bonferonni and Holm adjustments using `pairwise.t.test()` function from the `base` package (already installed). The `pairwise.t.test()` method asks you to input:
+## Raw data-based comparisons
+
+Raw data-based comparisons are those that are based on the raw data. That is, you are comparing the means of the groups that you have collected. As such, these tests also carry with them some of the basic assumptions that we have for the t-test. 
+
+- Normality: Assumes that the data are normally distributed.
+- Homogeneity of Variances: Assumes that the variances across groups are equal.
+
+
+These methods are typically called using the `pairwise.t.test()` function from the `base` package. This function takes three arguments:
 
 -   `x` = your DV
 -   `g` = your grouping factor
 -   `p.adjust.method` = the name of your desired correction in string format
+
 
 First let's run the `pairwise.t.tests` with no adjustment (akin to uncorrected $p$ values):
 
@@ -168,7 +219,7 @@ pairwise.t.test(x = dataset$Time, g = dataset$Group,p.adjust.method = "none")
 
 You see above that we get a cross-matrix containing the $p$ values for each cross pair (row × column). Remember this is something we would never do in a post hoc (no corrections) but I wanted to first run this to illustrate a point. Now let's run the the Bonferroni and Holm corrections:
 
-### Bonferroni example (pairwise.t.test())
+### Bonferroni example
 
 ```{r}
 pairwise.t.test(x = dataset$Time, g = dataset$Group,p.adjust.method = "bonferroni")
@@ -189,20 +240,20 @@ Remember from a few paragraphs back that there are 10 possible combinations so t
 
 Moving on...
 
-### Holm example (pairwise.t.test())
+### Holm example
 
 ```{r}
 pairwise.t.test(x = dataset$Time, g = dataset$Group,p.adjust.method = "holm")
 ```
 
-## Tukey HSD and REGWQ tests
+### Tukey HSD and REGWQ tests
 
 In order to run Tukey's HSD and REGWQ methods we call upon the `agricolae` package. In this case, we need to input our `lm() model` into the function, as well as identify our "treatment" (in this case our "Group" factor). For example:
 
 ### Tukey HSD example (agricolae)
 
 ```{r}
-morphine_mdl <- lm(Time~Group,data = dataset) # from above
+morphine_mdl <- lm(Time~Group_fct,data = dataset) # from above
 agricolae::HSD.test(morphine_mdl,trt = "Group",group = T,console = T) 
 ```
 
@@ -230,40 +281,43 @@ Compact letter displays are nice (SPSS generates them, too), but as seems to alw
 
 > CLD displays promote visually the idea that two means that are "not significantly different" are to be judged as being equal; and that is a very wrong interpretation. In addition, they draw an artificial "bright line" between P values on either side of alpha, even ones that are very close.
 
-## Using estimated marginal means, `emmeans()`
+## Model-based comparisions using estimated marginal means
 
-In previous years I would have stopped here and left you with the impression that you may need to call different packages depending on what post-hoc (or later, contrast) you intend to run. While this is perfectly acceptable, more and more I am using the estimated marginal means (package) to perform just about all of my post hoc analyses and contrasts. From the `emmeans` vignette [(link)](https://cran.r-project.org/web/packages/emmeans/vignettes/basics.html#EMMdef):
+While pairwise $t$-tests are conceptually more simple, they possesses inherent limitations when we scale towards multifactorial experimental designs and wish to control for multiple comparisons, potentially inflating the Type I error rate. Model based comparisions, such as those provided by the `emmeans` package, are more flexible and allow for a greater degree of control over the comparisons that you wish to make by comparing means that are adjusted for covariates or other factors in the model (i.e., controlling for other factors in your model).
 
-> Estimated marginal means are based on a model -- not directly on data. The basis for them is what we call the reference grid for a given model. To obtain the reference grid, consider all the predictors in the model.
+From the `emmeans` vignette [(link)](https://cran.r-project.org/web/packages/emmeans/vignettes/basics.html#EMMdef):
 
-(The notion of a reference grid will become more apparent when we more into factorial ANOVA For now, let's just focus on practical implementation).
+> Estimated marginal means (EMMs) are based on a model -- not directly on data. The basis for them is what we call the reference grid for a given model. To obtain the reference grid, consider all the predictors in the model.
 
-I typically use this framework as it allows for a higher level of flexibility in analyzing contrasts while still being unified. We'll see just how far we can go in the upcoming weeks. For now, let's use the `emmeans` package to perform our post-hoc analyses from above.
+(The notion of a reference grid will become more apparent when we more into factorial ANOVA. For now, consider a reference grid is created by considering all predictors in the model, and it synthesizes them to predict the response when factoring in all the variables in the model. EMMs are basically the means of the predictive distribution over this grid. This makes EMMs especially useful in the context of complex models, such as ANCOVA, regression, or mixed models, where covariates and random effects are considered. For simple models, such as one-way ANOVA, the EMMs are simply the means of the groups, so they are perhaps a bit overkill for this week's walkthrough. However, I'm going to introduce them here as they are my preferred method for post-hoc comparisons and "scale-up" for models that we will be covering in the coming weeks (as well as those that you will likely encounter in your own research).
+
+Let's use the `emmeans` package to perform our post-hoc analyses from above.
 
 We start by throwing our model into the `emmeans()` function, specifying our test as a function of our comparison. We also need to tell `R` what adjustment (correction) we desire. To remind ourselves, our model is:
 
 ```{r}
-morphine_mdl <- lm(formula = Time~Group,data = dataset)
+morphine_mdl <- lm(formula = Time~Group_fct,data = dataset)
 ```
 
-For a `pairwise` test with a `bonferroni` correction we need to specify what factor (or predictor or IV) we are running our pairwise comparisons on (`spec =`), and that we are `adjusting` by using the bonferonni (`bonf`). This takes the general form:
+For a comparision with a `bonferroni` correction we need to specify what factor (or predictor or IV) we are running our pairwise comparisons on (`spec =`), and that we are `adjusting` by using the bonferonni (`bonf`). This takes the general form:
 
 ```{r}
-emmeans(morphine_mdl, specs = ~Group) %>% pairs(adjust="bonf")
+emmeans(morphine_mdl, specs = pairwise~Group_fct, adjust="bonf")
 ```
 
-`emmeans` also allows us to run a pairwise Tukey test:
+`emmeans` also allows us to run a Tukey test:
 
 ```{r}
-emmeans(morphine_mdl, specs = ~Group) %>% pairs(adjust = "tukey")
+emmeans(morphine_mdl, specs = pairwise~Group_fct, adjust="tukey")
 ```
 
-## Alternative to CLD()
+## Alternative to CLD() if you're using emmeans
 
 One thing to note, the curator of the `emmeans()` package is not a fan of `cld` (Compact Letter Displays) and instead has created `pwpp` as a visualization tool.
 
 ```{r}
-emmeans(morphine_mdl, specs = ~Group) %>% pwpp()
+emmeans(morphine_mdl, specs = pairwise~Group_fct) %>% 
+  pwpp()
 ```
 
 You can visit [this vignette](https://cran.r-project.org/web/packages/emmeans/vignettes/comparisons.html) to get a feel for what is at issue here.
@@ -294,7 +348,7 @@ The functions `sigma()` and `df.residual()` allow us to get this information dir
 
 ```{r}
 # save your contrasts to an object
-mdl_contrasts <- emmeans(morphine_mdl, specs = ~Group)
+mdl_contrasts <- emmeans(morphine_mdl, specs = ~Group_fct)
 
 # use the saved object in the following function
 eff_size(mdl_contrasts,sigma = sigma(morphine_mdl), df.residual(morphine_mdl))
@@ -314,6 +368,6 @@ In your report, you need to include information for the main ANOVA as well as in
 
 If we work off of our last example, you'll note that there are quite a few comparisons that we could discuss (10 in fact). In cases like these you could either put this information into a formatted table, or simply highlight a few that are especially relevant. For example, looking at the `emmeans()` outcome as well as the `CLD` plot from `agricolae::HSD.test` we see that McM and SM (a's) in the CLD plot are both significantly greater than the remain conditions (b's). Based on this I would write something like:
 
-... Our ANOVA revealed a significant effect for Morphine treatment group, *F*(4, 35) = 27.325, *p* \< .001. Tukey pairwise comparisons revealed that the mean tolerance times for the both the SM ($M±SD$: 24.00 ± 6.37) and McM (29.00 ± 6.16) groups were greater than the remaining three groups ($ps$ \< .05), but not different from one another. The mean times for the remaining three conditions were not significantly different from one another, $ps > .05$ (see Figure 1)
+... Our ANOVA revealed a significant effect for Morphine treatment group, $F$(4, 35) = 27.325, $p <$ .001. Tukey pairwise comparisons revealed that the mean tolerance times for the both the SM ($M±SD$: 24.00 ± 6.37) and McM (29.00 ± 6.16) groups were greater than the remaining three groups ($ps$ \< .05), but not different from one another. The mean times for the remaining three conditions were not significantly different from one another, $ps > .05$ (see Figure 1)
 
 -   assuming Figure 1 is a camera ready plot you've created in `ggplot()`. Any of the barplots in this walkthrough will suffice.

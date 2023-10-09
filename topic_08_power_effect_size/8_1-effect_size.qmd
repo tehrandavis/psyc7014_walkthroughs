@@ -438,7 +438,7 @@ So what is known: we have 17 total participants from (hypothetically) the same p
 t.test(Weight~Treatment, data=anorexia_data, paired=T)
 ```
 
-We can estimate the effect size using the `effectsize` package and pasting in the exact same arguments that we used for the t-test.
+We can estimate the effect size using the `rstatix` package and pasting in the exact same arguments that we used for the t-test.
 
 In this case we want to calculate Cohen's $d$. Since we have a small sample size, we might also apply Hedge's correction to reduce the possibility of over-inflating our effect. To do this in `R`, I recommend using the `cohens_d` function from the `rstatix` package, which in addition to providing you which Cohen's $d$ also give you a subjective statement about the magnitude of the effect (what's small, medium, and large is based on convention):
 
@@ -449,6 +449,8 @@ rstatix::cohens_d(Weight~Treatment,
                   data=anorexia_data, 
                   paired = T,
                   hedges.correction = T)
+
+
 ```
 
 Pretty strong effect we've got here.
@@ -456,4 +458,6 @@ Pretty strong effect we've got here.
 In our document we would include this value along side our report of the $t$-test like so:
 
 $t(16) = 4.18, p < .001, d = 0.97$
+
+
 
