@@ -76,10 +76,13 @@ book:
         - topic_09_oneway_anova/9_2-anova-regression.qmd
         - topic_09_oneway_anova/9_3-posthocs.qmd
         - topic_09_oneway_anova/9_4-planned_contrasts.qmd
+        - topic_09_oneway_anova/9_5-example_analysis.qmd
+
     - part: "Part 10: FACTORIAL ANOVA"
       chapters:
         - topic_10_factorial_anova/10_1-main_effects.qmd
         - topic_10_factorial_anova/10_2-factorial_w_post_hocs.qmd
+        - topic_10_factorial_anova/10_2b-example_analysis.qmd
         - topic_10_factorial_anova/10_3-interactions.qmd 
         - topic_10_factorial_anova/10_4-advanced_example_and_apa.qmd 
         - topic_10_factorial_anova/10_5-higher_order_anova.qmd

@@ -1,0 +1,157 @@
+---
+title: "Simple Example Analysis"
+editor: visual
+---
+
+At this point I'd like to pause to run through a simple example analysis step by step based upon some data we worked with in class. As with the last one of these, think of this as a tldr; version of the previous two walkthroughs.
+
+## Evaluating Exam Performance in Different Learning Environments
+
+In the wake of evolving educational systems, a school district is keen to optimize learning experiences and academic performance. They have integrated both traditional classroom settings and online platforms for educational delivery. Additionally, they offer a range of curricula: Standard, Intermediate, and Advanced, to cater to students with varying academic abilities.
+
+The educational board hypothesizes that classroom environment and curriculum type may have distinct impacts on students' exam performance. To investigate this, they decide to conduct a study involving high school students from multiple schools within the district.
+
+#### Objectives:
+
+1.  To determine if a **traditional classroom** environment is more conducive to learning compared to an **online setting**, taking into account varying curricula.
+2.  To assess if the level of curriculum---**Standard, Intermediate, or Advanced**---significantly affects exam scores, and whether this effect differs between traditional and online classrooms.
+
+#### Participants:
+
+Approximately 300 high school students participate in this study. Students are equally distributed among traditional and online settings and among the three curriculum types.
+
+#### Methodology:
+
+-   Students are randomly assigned to one of the two classroom environments (Traditional or Online).
+-   Within each classroom environment, students are further assigned to one of the three types of curriculum (Standard, Intermediate, Advanced).
+-   At the end of the semester, students' exam scores are recorded. The exam is standardized and is out of 100 points.
+
+#### Data Collection:
+
+-   Classroom Environment: Traditional or Online
+-   Curriculum Type: Standard, Intermediate, Advanced
+-   Exam Score: Ranging from 0 to 100
+
+#### Data Analysis Plan:
+
+1.  Conduct a factorial ANOVA to investigate the main effects of classroom environment and curriculum type, as well as their interaction, on exam scores.
+2.  If significant interactions are found, conduct post-hoc tests to understand the nature of these interactions.
+
+#### Anticipated Outcomes:
+
+The educational board is particularly interested in identifying whether certain combinations of classroom environment and curriculum type yield significantly higher exam scores, as this information could guide future educational strategies within the district.
+
+------------------------------------------------------------------------
+
+Summary of design
+
+**Independent Variables:**
+
+-   Classroom Environment (Traditional, Online)
+
+-   Curriculum Type (Standard, Intermediate, Advanced)
+
+Dependent Variable:
+
+-   Exam Score (0-100)
+
+## Analysis
+
+### Dependencies
+
+**Packages:**
+
+```{r}
+pacman::p_load(rstatix,
+               cowplot, 
+               tidyverse, 
+               emmeans,
+               performance)
+```
+
+**Data**
+
+```{r}
+learning_df <- read_csv("http://tehrandav.is/courses/statistics/practice_datasets/learning_environments.csv")
+```
+
+```{r}
+str(learning_df)
+learning_df %>% head()
+
+```
+
+### Descriptive Stats
+
+**Summary Table:**
+
+```{r}
+# table of cell means
+learning_df %>%
+  group_by(ClassEnv,Curriculum) %>%
+  rstatix::get_summary_stats(type = "mean_se")
+```
+
+**Figure**
+
+```{r}
+ggplot(learning_df, aes(x = ClassEnv, y = ExamScore, group = Curriculum)) +
+  stat_summary(fun.data = "mean_se", geom = "pointrange", aes(shape = Curriculum)) +
+  stat_summary(fun = "mean", geom = "line", aes(linetype = Curriculum)) +
+  theme_cowplot()
+```
+
+### Build the model
+
+In the past I've recommended `lm` to reinforce that this is just another linear model. Moving forward I'm going to emphasize using `aov` which as I mentioned before is just a fancy wrapper for `lm`. Using `aov` provides the most consistent and efficient path for running ANOVA using the frameworks we've employed to this point.
+
+```{r}
+learning_model <- aov(ExamScore ~ ClassEnv + Curriculum, data = learning_df)
+```
+
+### Test model assumptions
+
+```{r}
+performance::check_normality(learning_model)
+performance::check_homogeneity(learning_model)
+```
+
+### Perform ANOVA
+
+```{r}
+anova_test(learning_model, effect.size = "pes")
+```
+
+#### No Main effect for `ClassEnv`
+
+-   nothing to see here, moving on.
+
+#### Main effect for Curriculum
+
+-   has three levels. Need to run a post hoc test
+
+    ```{r}
+    emm_mdl <- emmeans(learning_model, specs = ~Curriculum)
+    emm_mdl %>% pairs()
+    ```
+
+-   means table for curriculum
+
+    ```{r}
+    learning_df %>%
+      group_by(Curriculum) %>%
+      get_summary_stats(type = "mean_se")
+    ```
+
+## Conclusions / Write-up
+
+We hypothesized students exam performance would be influenced by both the classroom environment and the type of curriculum. To test these hypotheses we submitted exam scores to a 2 (Environment) $\times$ 3 (Curriculum) ANOVA. The ANOVA revealed a significant main effect for Curriculum, $F$ (2, 296) = 49.19, $p$ \< .001, $\eta_p^2$ = .25. As seen in Figure 1 (below), Tukey post-hoc comparisions revealed significant differences between the three curriculum types (\$ps\$ \< .05). Students' exam scores were higher for those that took the Advanced curriculum ($M±SE$: 82.1 ± 1.0) compared to the Intermediate (73.7 ± 1.0) and Standard (67.7 ± 1.1) conditions.
+
+```{r}
+ggplot(learning_df, aes(x = ClassEnv, y = ExamScore, group = Curriculum)) +
+  stat_summary(fun.data = "mean_se", geom = "pointrange", aes(shape = Curriculum)) +
+  stat_summary(fun = "mean", geom = "line", aes(linetype = Curriculum)) +
+  theme_cowplot() +
+  theme(legend.position = c(.75, .18)) + 
+  xlab("Classroom environment") + ylab("Exam score")
+```

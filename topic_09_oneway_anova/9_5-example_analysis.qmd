@@ -1,0 +1,250 @@
+---
+title: "Example analysis"
+author: "Tehran Davis"
+---
+
+OK. Some I know we've covered a lot of material and some of you have asked for a conscie walkthrough of an analysis. This walkthrough doesn't go into as much of the conceptual details, but instead focuses on how I would approach an analysis including some of the practical things that I would do to make the analysis more concise and reproducible.
+
+## The data: Neuropsychological Performance Across Different Intervention Strategies for Dyslexia
+
+Here's a toy example of a dataset that I've created to illustrate the analysis.
+
+### Background:
+
+Dyslexia is a neurological condition that affects reading, spelling, and occasionally arithmetic skills. Different intervention strategies may be applied to individuals with dyslexia to enhance their neuropsychological performance.
+
+### Objective:
+
+To examine whether there is a statistically significant difference in neuropsychological performance among individuals with dyslexia who are exposed to three different intervention strategies.
+
+### Variables:
+
+-   **Independent Variable**: Intervention Strategy (three levels: Phonological, Multisensory, Computerized)
+-   **Dependent Variable**: Neuropsychological Performance Score (a continuous variable measured via a comprehensive assessment)
+
+### Hypotheses:
+
+-   **Null Hypothesis (H0)**: There is no significant difference in neuropsychological performance scores across the three intervention strategies.
+-   **Alternative Hypothesis (H1)**: There is a significant difference in neuropsychological performance scores across the three intervention strategies.
+
+### Design:
+
+-   **Participants**: 60 individuals diagnosed with dyslexia.
+-   **Groups**:
+    1.  **Phonological Strategy Group** (n=20): Individuals undergo a traditional phonological-awareness training **(this is your control)**
+    2.  **Multisensory Strategy Group** (n=20): Individuals engage in interventions involving visual, auditory, and kinesthetic (touch) stimuli.
+    3.  **Computerized Strategy Group** (n=20): Individuals utilize computer-based learning and practice programs.
+
+### Data Collection:
+
+Each participant is assessed on their neuropsychological performance using a standardized neuropsychological assessment post-intervention.
+
+
+## The analysis
+
+### Step 1: Load in the default packages:
+
+```{r}
+pacman::p_load(tidyverse, 
+               rstatix,
+               cowplot,
+               performance)
+```
+
+### Step 2: Load in the data and take a look at it:
+
+```{r}
+dyslexia_df <- read_csv("https://tehrandav.is/courses/statistics/practice_datasets/dyslexia_interventions_groups.csv")
+str(dyslexia_df)
+```
+
+### Step 3: Perform any necessary data wrangling:
+
+In this case the data looks like it's in the right format (Long) and most things look okay. However the output above indicated that the `intervention` variable is a character vector (`read_csv` does this by default). At some point we may need to convert it to a factor so better to do it now.
+
+```{r}
+dyslexia_df <- 
+  dyslexia_df %>%
+  mutate(intervention = as.factor(intervention))
+```
+
+### Step 4: Describe the data:
+
+#### Descriptive statistics:
+
+```{r}
+dyslexia_df %>%
+  group_by(intervention) %>%
+  get_summary_stats(neuro_score, type = "mean_se")
+```
+
+#### Summary plot:
+```{r}
+ggplot(dyslexia_df, aes(x = intervention, y = neuro_score)) +
+  stat_summary(fun.data = "mean_se") +
+  theme_cowplot()
+```
+
+### Step 4: Create the model:
+
+In order to do some of our testing later on, we need to save the model that we create. We'll do this by creating a variable called `dyslexia_model` and saving the model to that variable.
+
+```{r}
+dyslexia_model <- lm(neuro_score ~ intervention, data = dyslexia_df)
+```
+
+### Step 5: Check the assumptions of the model:
+
+#### Visualization of performance of assumptions:
+```{r}
+performance::check_model(dyslexia_model, check = c("qq","homogeneity"))
+```
+
+#### Assumption 1: Normality
+
+```{r}
+performance::check_normality(dyslexia_model)
+```
+
+#### Assumption 2: Homogeneity of variance
+
+```{r}
+performance::check_homogeneity(dyslexia_model)
+```
+
+In this case, all checks out, so we can keep this model.
+
+### Step 6: Run the ANOVA:
+
+Since this is a simple One-way ANOVA, I need to get general eta-squared for my effect size:
+
+```{r}
+dyslexia_model %>% rstatix::anova_test(effect.size = "ges")
+```
+
+### Step 7: Run the post-hoc tests:
+
+#### 7a: Create an estimated marginal means `emmeans` model:
+
+I recommend saving the `emmeans` model to a variable called (in this case I'm naming it `post_hoc_emm`) so that you can use it for different things later on.
+
+```{r}
+pacman::p_load(emmeans)
+post_hoc_emm <- emmeans(object = dyslexia_model, # the model
+                          spec = ~ intervention) # the stucture of the comparisons, in this case, we're comparing the intervention variable
+```
+
+#### 7b: Run a pairwise comparison:
+
+To run a pairwise contrast, take the emmeans model and send it to `pairs` and specify the adjustment method. In this case, we're using the Tukey adjustment.
+
+```{r}
+post_hoc_emm %>% pairs(adjust = "tukey")
+```
+
+### Step 8: Create a camera ready plot:
+
+In this case I'm going to do a violin plot with the means and standard errors plotted on top of it.
+
+```{r}
+ggplot(dyslexia_df, aes(x = intervention, y = neuro_score)) +
+  geom_violin(fill = "lightgray") +
+  stat_summary(fun.data = "mean_se", size = 1) +
+  theme_cowplot() +
+  labs(x = "Intervention Strategy", 
+       y = "Neuropsychological Performance Score") +
+  theme(axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"))
+```
+
+## Assuming that you are running planned contrasts
+
+Let's assume that I have an *a priori* hypothesis that any intervention is better than a phonological intervention (a digression is that perhaps I should have a no intervention group as a proper experimental control, BUT knowing that it would be improper ethically to not give an intervention to a group of people diagnoses with dyslexia, I'm going to assume that this is the best that I can do). I also want to know if a multisensory intervention is better than a computerized intervention.
+
+To run a planned contrast I would repeat steps 1-6 above. I'm just going to stick that in a single chunk:
+  
+```{r}
+#| eval: false
+  
+# Step 1: Load in the default packages:
+pacman::p_load(tidyverse, 
+               rstatix,
+               cowplot,
+               performance,
+               emmeans)
+
+# Step 2: Load in the data and take a look at it:
+dyslexia_df <- read_csv("https://tehrandav.is/courses/statistics/practice_datasets/dyslexia_interventions_groups.csv")
+
+# Step 3: Data wrangling
+# Convert intervention to a factor
+dyslexia_df <- 
+  dyslexia_df %>%
+  mutate(intervention = as.factor(intervention))
+
+# Step 4: Describe the data:
+## Descriptive statistics:
+dyslexia_df %>%
+  group_by(intervention) %>%
+  get_summary_stats(neuro_score, type = "mean_se")
+
+## Summary plot:
+ggplot(dyslexia_df, aes(x = intervention, y = neuro_score)) +
+  stat_summary(fun.data = "mean_se") +
+  theme_cowplot()
+
+# Step 5: Create the model:
+dyslexia_model <- lm(neuro_score ~ intervention, data = dyslexia_df)
+
+# Step 6: Check the assumptions of the model:
+## Visualization of performance of assumptions:
+performance::check_model(dyslexia_model, check = c("qq","homogeneity"))
+
+## Assumption 1: Normality
+performance::check_normality(dyslexia_model)
+
+## Assumption 2: Homogeneity of variance
+performance::check_homogeneity(dyslexia_model)
+```
+
+
+### Step 7: Run our planned contrast:
+
+For this to work we will have needed to convert our `intervention` variable to a factor (Step 3). If you haven't done that, you'll need to do that now.
+
+#### Step 7a: get the ordering of the levels in the contrast:
+
+By default, this should be alphabetical, but I like to check just in case:
+
+```{r}
+levels(dyslexia_df$intervention)
+```
+
+#### Step 7b: create the contrasts according to the ordering:
+
+Remember to stick the planned contrast into a `list()` variable to use later on.
+```{r}
+my_planned_contrasts <- list(
+  "Any Intervention vs. Phonological" = c(-1/2, -1/2, 1),
+  "Multisensory vs. Computerized" = c(0, -1, 1)
+)
+```
+
+#### Step 7c: create an emmeans object specifying the variable to be contrasted:
+
+```{r}
+a_priori_emm <- emmeans(object = dyslexia_model, 
+                        spec = ~ intervention)
+```
+
+#### Step 7d: Perform the contrasts
+
+Finally submit the apriori emmeans object to the `contrast` function and specify the contrasts that you want to run in the `method`. We also may specify the correction (bonferroni) if we feel it necessary. 
+
+In this case we're going to run the two contrasts that we specified in Step 7b with a bonferroni correction.
+
+```{r}
+a_priori_emm %>% 
+  contrast(method = my_planned_contrasts, adjust = "bonferroni")
+```
+
