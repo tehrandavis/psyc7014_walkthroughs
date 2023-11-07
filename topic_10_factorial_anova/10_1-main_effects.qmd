@@ -14,7 +14,7 @@ pacman::p_load(emmeans,
 
 ## TLDR;
 
-To run a factorial ANOVA we can use the `lm()` method we are familiar with. In this walkthrough we only focus on what can be done with the omnibus ANOVA assuming no interactions:
+To run a factorial ANOVA we can use the `aov()` method we are familiar with. In this walkthrough we only focus on what can be done with the omnibus ANOVA assuming no interactions:
 
 The general steps for running a factorial ANOVA:
 
@@ -36,7 +36,7 @@ dataset <- read_csv("http://tehrandav.is/courses/statistics/practice_datasets/fa
 
 # Step 1: create the additive ANOVA model
 # note that this is not a full factorial model, but what we are focusing on this week:
-aov_model <- lm(Score~Lecture + Presentation,data = dataset)
+aov_model <- aov(Score~Lecture + Presentation,data = dataset)
 
 # Step 2a: test normalty / heteroscadicity using model visually, best to run from your console:
 performance::check_model(aov_model)
@@ -241,7 +241,11 @@ ggplot(data = dataset_2by2, mapping=aes(x=Smkgrp,y=score,group=Task)) +
                  fun.data = "mean_se", 
                  position = position_dodge(.9)) +
   theme(legend.position="none") +
-  scale_fill_manual(values = c("light grey", "white"))
+  scale_fill_manual(values = c("light grey", "white")) +
+  theme_cowplot() +
+   # fix annoying gap at bottom of barplot
+  scale_y_continuous(expand = c(0,0))
+  
 ```
 
 Note that the grey fills above are the "Driving Simulation" group and the white are the "Pattern Recognition". Take a look at the means. If the relative difference between grouped means changes as you move from one category on the x-axis to the next, you likely have an interaction. Note that this is a general rule of thumb and applies to the line plots as well (the reason that the lines intersect is because of these sorts of changes). In this case, the bar (cell) means on the "Active" grouping are nearly identical, while the bar means in the "Nonsmoking" grouping are much further apart. So we likely have interaction.
@@ -262,7 +266,6 @@ Smoke_main_effect_plot <- ggplot2::ggplot(data = dataset_2by2, mapping=aes(x=Smk
   theme_cowplot()
 
 show(Smoke_main_effect_plot)
-
 ```
 
 ```{r}
@@ -279,7 +282,7 @@ Task_main_effect_plot <- ggplot2::ggplot(data = dataset_2by2, mapping=aes(x=Task
 show(Task_main_effect_plot)
 ```
 
-and would take a look at changes due to each IV without considering the other. Here we might infer that there is a main effect for both of our IVs.
+and would take a look at changes due to each IV without considering the other. Here we might infer that there is a main effect for both of our IVs. **Note that when constructing a line plot with only one IV, you still need to specify `group = 1` in your `aes()` function. Otherwise the you may get an error about line grouping.**
 
 That said, the original interaction plot is useful as well in assessing main effects as well. In this case, to infer whether there might be main effects we can imagine where the means would be if we collapsed our grouped plots (this is exactly what the main effects take a look at). To help with your imagination I'm going to plot our main effect means on the interaction plot. Here the grey-filled triangles represent the the collapsed Smoking Group means indifferent to task. To get these, just imagine finding the midpoint of the two circles in each level of Smoking group. The slope suggests the possibility a main effect.
 
@@ -320,9 +323,9 @@ So in summary, I'm guessing from plot I've got 2 main effects and an interaction
 
 For now, let's focus on testing the main effects.
 
-## Running the ANOVA `lm()` method
+## Running the ANOVA `aov()` method
 
-Now we can run the using the `lm()` method as we have previously done with the One-way ANOVA. The new wrinkle is simply adding our additional IV terms to the the formula equation:
+Now we can run the using the `aov()` method as we have previously done with the One-way ANOVA. The new wrinkle is simply adding our additional IV terms to the the formula equation:
 
 $$
 y=IV_1+IV_2+...+IV_n
@@ -333,7 +336,7 @@ where the first and second terms capture our main effects and the third is our i
 Using our data in `R` this formula becomes:
 
 ```{r eval=FALSE}
-aov_model <- lm(score~Smkgrp+Task,data = dataset_2by2)
+aov_model <- aov(score~Smkgrp+Task,data = dataset_2by2)
 ```
 
 ## Assumption testing
@@ -348,7 +351,7 @@ aov_model %>% performance::check_model()
 
 Alternatively, running the above with **`panel = FALSE`** allows you to see each plot individually.
 
-```{r}
+```{r eval = FALSE}
 aov_model %>% performance::check_model(panel = FALSE)
 ```
 
@@ -393,7 +396,6 @@ dataset_2by2 %>%
   group_by(Task, Smkgrp) %>%
   rstatix::get_summary_stats(score)
 ```
-
 
 Recalling that we had an issue with heteroscadicity, we can now use the obtained `sd` values to assess whether our violation is too great. Let's save our summary table:
 

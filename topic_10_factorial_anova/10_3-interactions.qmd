@@ -8,12 +8,12 @@ This write-up requires the following packages:
 
 ```{r}
 pacman::p_load(tidyverse, 
-               cowplot, 
-               agricolae, 
-               Rmisc, 
-               psych,
+               cowplot,
+               rstatix,
                emmeans,
-               pander)
+               pander,
+               performance,
+               Rmisc)
 ```
 
 ## Example 1: a 2×2 ANOVA
@@ -71,10 +71,12 @@ Interaction plots take into consideration the influence of each of the IVs on on
 # line plot
 ggplot(data = dataset_2by2, mapping=aes(x=Smkgrp,
                                         y=score,
-                                        group=Task)) + # grouping the data by levels of Task
+                                        group=Task,
+                                        shape = Task)) + # grouping the data by levels of Task
   stat_summary(geom="pointrange",
                fun.data = "mean_cl_normal", 
-               position=position_dodge(.5)) + # dodging position so points do not overlap with one another
+               position=position_dodge(.5),
+               size = 1) + # dodging position so points do not overlap with one another
   stat_summary(geom = "line", 
                fun = "mean", 
                position=position_dodge(.5), 
@@ -87,16 +89,20 @@ ggplot(data = dataset_2by2, mapping=aes(x=Smkgrp,
 As before we can build our ANOVA model and test it against the requisite assumptions
 
 ```{r}
-aov_model <- lm(score~Smkgrp*Task,data = dataset_2by2)
-
-aov_model$residuals %>% car::qqPlot()
-aov_model %>% car::leveneTest()
+aov_model <- aov(score~Smkgrp*Task,data = dataset_2by2)
 ```
 
-As in the last walkthrough we'll ignore the issues with homogeneity. Let's run our ANOVA:
+```{r}
+aov_model %>% performance::check_model()
+aov_model %>% performance::check_normality()
+aov_model %>% performance::check_homogeneity()
+
+```
+
+As in the last walkthrough we'll ignore the issues with homogeneity. Let's print our ANOVA table:
 
 ```{r}
-aov_model %>% sjstats::anova_stats()
+aov_model %>% rstatix::anova_test(effect.size = "pes")
 ```
 
 ### Adressing the interaction
@@ -108,24 +114,26 @@ I bring this up, as while it may be appropriate to mention both trends, you typi
 In this case I'm going test the second variant, testing how performance on each cognitive task changes by virtue of smoking group. To run a post-hoc ANOVA. This can be accomplished sending our model to `emmeans()`. Below, the `|` operator can be understood as "nested within". So the model is saying take a look at how smoking group scores change **on each level of task**.
 
 ```{r}
-aov_model %>% emmeans(spec=~Smkgrp|Task)
+simple_effects_by_task <- emmeans(aov_model, spec=~Smkgrp|Task)
 ```
 
-FWIW, if it helps, the following is equivalent:
+FWIW, if it helps, the following is an equivalent way of writing this:
 
 ```{r}
-aov_model %>% emmeans(spec= "Smkgrp", by = "Task")
+simple_effects_by_task <- emmeans(aov_model, spec= "Smkgrp", by = "Task")
 ```
 
 In either case, Smoking Group only has 2-levels I can send this to a pairwise test:
 
 ```{r}
-aov_model %>% 
-  emmeans(spec= "Smkgrp", by = "Task") %>%
+simple_effects_by_task %>%
   pairs(adjust="tukey")
 ```
 
-The output above shows what we expect, that for Pattern recognition groups, scores are indifferent to whether participants are smokers or not, where with the Driving simulation groups, Nonsmokers performed much better.
+The output above shows what we expect (given what we saw in our plot):
+
+-   for **groups that performed the Pattern recognition Task**, scores are indifferent to whether participants are smokers or not
+-   for **groups that performed the Driving simulation Task**, Nonsmokers performed much better.
 
 ## 2 × 3 ANOVA
 
@@ -171,19 +179,49 @@ ggplot(dataset,mapping = aes(x = Lecture,y = Score, group=Presentation)) +
                aes(shape=Presentation)) + # each level of presentation gets a shape
   stat_summary(geom = "line", fun.y="mean", position = position_dodge(.25)) +
   theme_cowplot() +
-  theme(plot.margin=unit(c(.25,.25,.25,.25),"in"))
+  theme(plot.margin=unit(c(.25,.25,.25,.25),"in")) # adding .25 inch margins to plot
 ```
 
-And now getting the cell means and marginal means. Remember that analysis of the marginal means is what is tested in the main effects. The test for an interaction focuses on the cell means. Here we are using the `summarySE` function from the `Rmisc` package. I find it to be more efficient than `psych::describeBy()` and its useful next week when we do Repeated Measures ANOVA
+And now getting the cell means and marginal means. Remember that analysis of the marginal means is what is tested in the main effects. The test for an interaction focuses on the cell means. Up to this point we've been using `tidyverse` grouping methods to do so. For example:
 
 ```{r}
+# cell means (interaction effect):
+dataset %>%
+  group_by(Presentation,Lecture) %>%
+  rstatix::get_summary_stats(Score, type = "mean_se")
+```
+
+```{r}
+# marginal means: Lecture (main effect)
+dataset %>%
+  group_by(Lecture) %>%
+  rstatix::get_summary_stats(Score, type = "mean_se")
+```
+
+```{r}
+# marginal means: Presentation (main effect)
+dataset %>%
+  group_by(Presentation) %>%
+  rstatix::get_summary_stats(Score, type = "mean_se")
+```
+
+**TOTALLY OPTIONAL ALTERNATIVE:** If you're not married to the `tidyverse` an nice alternative to getting means tables is to use `summarySE` function from the `Rmisc` package. On the plus, using `summarySE` involves a little less typing, on the minus it doesn't generate as much info as `rstatix::get_summary_stats`
+
+```{r}
+pacman::p_load(Rmisc)
+
 # cell means:
 summarySE(data = dataset,measurevar = "Score", groupvars = c("Presentation","Lecture"))
+```
 
-# marginal means
+```{r}
+# marginal means: Lecture
 summarySE(data = dataset,measurevar = "Score", groupvars = "Lecture")
-summarySE(data = dataset,measurevar = "Score", groupvars = "Presentation")
+```
 
+```{r}
+# marginal means: Presentation
+summarySE(data = dataset,measurevar = "Score", groupvars = "Presentation")
 ```
 
 ### the Omnibus ANOVA (and assumption tests)
@@ -191,17 +229,18 @@ summarySE(data = dataset,measurevar = "Score", groupvars = "Presentation")
 The very first ANOVA model that we build crosses all of our independent variables. This is the **omnibus ANOVA**. Let's build this model and run our assumption checks
 
 ```{r}
-omnibus_aov <- lm(Score~Lecture*Presentation, dataset)
+omnibus_aov <- aov(Score~Lecture*Presentation, dataset)
+```
 
+```{r}
 # check the normality assumption of the residuals:
-omnibus_aov$residuals %>% car::qqPlot()
-omnibus_aov %>% car::leveneTest()
+omnibus_aov %>% check_model()
 ```
 
 Good to go, let's check our results:
 
 ```{r}
-sjstats::anova_stats(omnibus_aov)[1:8]
+rstatix::anova_test(omnibus_aov, effect.size = "pes", type = 3)
 ```
 
 **Looking at the ANOVA**: Our assumptions tests check out, and our ANOVA reveals two main effects and in interaction. Looking back at the plot (always, always plot before you think about doing any sort of follow-ups!!) it is fairly apparent what is happening---when moving from one lecture to the next, we see a much more dramatic decrease in score for the Social group in the **Standard** presentation group compared to the **Computer** presentation. That is, moving from left to right the pattern of change is different for the **Standard** group, compared to the **Computer** group. This is what our eyeball test is telling us---we need to confirm it with some stats! There are two ways to address this interaction, each involves sub-setting the data for further analysis.
@@ -214,7 +253,9 @@ You could check for difference between Presentations on each Lecture type. Here 
 
 Which you choose, ultimately depends on which narrative you are trying to convey in your data. Here it may make sense to do the former. That is eyeballing the data it looks like the means in the Computer presentation level are not as different from one another as the Standard presentation.
 
-## Running the simple effects ANOVA in 6 steps:
+## Manually running a simple effects ANOVA:
+
+***Keep in mind that this section is for illustrative purposes only. Make sure you have a feel for the rationale here, but I would never expect you to run your analyses this way!***
 
 Given that we have elected to take a look at Lecture on each level of Presentation, we would need to run 2 **simple effects ANOVAs**. This is because breaking the omnibus in this way still leaves in each subsequent analysis a comparison of the 3 levels of Lecture. Basically we are running 2 separate One-way ANOVAs:
 
@@ -223,12 +264,15 @@ Given that we have elected to take a look at Lecture on each level of Presentati
 
 There is, however, one major caveat. When you run the follow-up ANOVA **you need to use the error terms from your omnibus ANOVA**. That is your simple effects ANOVA calls for the omnibus ANOVA errors: Sum of Squares, Mean Square Error, and denominator degrees of freedom.
 
-**What this means is that if you were to actually run this data as two distinct One-Way ANOVAs, the F-value (and subsequent p-values) that you get would be WRONG. For example simply running a `filter` and then ANOVA like this will not work:**
+**What this means is that if you were to actually run this data as two distinct One-Way ANOVAs, the F-value (and subsequent p-values) that you get would be WRONG. For example simply running a `filter` and then ANOVA like this will not work. I REPEAT THIS IS NOT THE RIGHT WAY TO DO THIS!!!!:**
 
 ```{r}
-# this is wrong... don't do this!!!
-lm(Score~Lecture, dataset %>% filter(Presentation=="Computer")) %>%
-  sjstats::anova_stats() %>% dplyr::select(1:8) %>% pander
+computer_data <- dataset %>% 
+  filter(Presentation=="Computer")
+
+comp_aov <- aov(Score~Lecture, computer_data)
+
+comp_aov %>% rstatix::anova_test(effect.size = "pes")
 ```
 
 A quick glance at the table above reveals the error. You'll notice that the denominator df are 15 where in the omnibus ANOVA they were 30. Fixing this isn't as simple as adjusting the denominator df and looking it up on the F-table. This involves a series of calculations that results in a different F-ratio as well. For the sake of clarity I'm going to show you how to do this "by hand" and then show you how you'll never need to do it "by hand"
@@ -237,27 +281,33 @@ There are several steps that need to be run for each simple effects ANOVA:
 
 ### step 1: get the omnibus ANOVA:
 
-Assuming you haven't already we need to run the omnibus ANOVA. Let's get this again
+Assuming you haven't already we need to run the omnibus ANOVA. Let's get this again.
 
 ```{r}
-omnibus_aov <- lm(Score~Lecture*Presentation, dataset)
+omnibus_aov <- aov(Score~Lecture*Presentation, dataset)
+```
+
+This time around I'm going to generate my ANOVA table using `anova()`. This adds a few more values to the ANOVA table that are important for later calculations:
+
+```{r}
+omnibus_aov %>% anova()
 ```
 
 ### step 2: get the MSError, Error df, and Error SS from omnibus ANOVA
 
-We can pull these values directly from the `sjstats::anova_stats()` output. It easier to just save this output to an object first. We can then check its `attributes()`
+We can pull these values directly from the output above. It easier to just save this output to an object first. We can then check its `names()`
 
 ```{r}
-omnibus_values <- sjstats::anova_stats(omnibus_aov)
-attributes(omnibus_values)
+omnibus_values <- anova(omnibus_aov)
+names(omnibus_values)
 ```
 
 In the above list, we are interested in `sumsq` and `df`. We need to index each by number. In this case residuals are on the 4th line:
 
 ```{r}
-omnibus_df <- omnibus_values$df[4]
-omnibus_mse <- omnibus_values$meansq[4]
-omnibus_ss_error <- omnibus_values$sumsq[4]
+omnibus_df <- omnibus_values$Df[4]
+omnibus_mse <- omnibus_values$"Mean Sq"[4]
+omnibus_ss_error <- omnibus_values$"Sum Sq"[4]
 ```
 
 ### step 3: subset your data accordingly
@@ -269,15 +319,17 @@ computer_data <- filter(dataset, Presentation=="Computer")
 standard_data <- filter(dataset, Presentation=="Standard")
 ```
 
-(FWIW you could also do the subsetting in the `lm()` call)
+(FWIW you could also do the subsetting in the `aov()` call)
 
 ### step 4: run your One-way simple effects ANOVA(s)
 
 Here I'm focusing on the `computer_data` for my example. You can return to the `standard_data` later.
 
 ```{r}
-computer_aov_values <- lm(Score~Lecture, dataset %>% filter(Presentation=="Computer")) %>%
-  sjstats::anova_stats()
+computer_aov <- aov(Score~Lecture, computer_data)
+
+computer_aov_values <- anova(computer_aov)
+
 computer_aov_values
 ```
 
@@ -287,11 +339,11 @@ As before, this can be done by calling attributes from our simple ANOVA, `comput
 
 ```{r}
 # treatment df
-simple_df <- computer_aov_values$df[1]
+simple_df <- computer_aov_values$Df[1]
 # treatment MS
-simple_ms <- computer_aov_values$meansq[1]
+simple_ms <- computer_aov_values$"Mean Sq"[1]
 # and the simple treatment SS:
-simple_ss <- computer_aov_values$sumsq[1]
+simple_ss <- computer_aov_values$"Sum Sq"[1]
 ```
 
 ### step 6: make our corrections
@@ -310,28 +362,28 @@ corrected_p <- (1-pf(corrected_f,df1 = simple_df,df2 = omnibus_df))
 corrected_pes <- (simple_ss/(simple_ss+omnibus_ss_error))
 ```
 
-Congrats!! You have made the appropriate corrections! Taking a look at your corrected result it appears that we should accept the null hypothesis of no difference in means on the computer data. As with posthoc comparisons, effect sizes for simple effects ANOVA are somewhat debatable, but this might be the most appropriate way to do this.
+Congrats!! You have made the appropriate corrections! Taking a look at your corrected result it appears that we fail to reject the null hypothese of no difference in means on the computer data. As with posthoc comparisons, effect sizes for simple effects ANOVA are somewhat debatable, but this might be the most appropriate way to do this.
 
 ```{r}
 tibble(corrected_f, corrected_p, corrected_pes)
 ```
 
-## the emmeans() way
+## the right way to do it!!!
 
 ### the simple effects ANOVA
 
-In years past, I would have shown you how to create your own function to do this, but instead we can also use `emmeans()` to conduct simple effects follow-ups. In this case we need to tell `emmeans()` how to parse our `omnibus.aov` model. Here we are telling it to look at the effects of `Lecture` on each level of `Presentation`.
+In years past, I would have shown you how to create your own function to do all of the steps above, but instead we can also use `emmeans()` to conduct simple effects follow-ups. In this case we need to tell `emmeans()` how to parse our `omnibus_aov` model. Here we are telling it to look at the effects of `Lecture` on each level of `Presentation`.
 
 ```{r}
-simple_effects_by_presentation <- emmeans(omnibus_aov, ~Lecture|Presentation)
+simple_effects_by_presentation <- 
+  emmeans(omnibus_aov, ~Lecture|Presentation)
 ```
 
 We can then pipe our simple effects `emmeans` into this call to run BOTH simple effects ANOVA
 
 ```{r}
-simple_effects_by_presentation %>% 
-  pairs() %>% 
-  test(joint=T)
+joint_tests(simple_effects_by_presentation, by = "Presentation")
+  
 ```
 
 Based on this output we have a simple effect for standard but not computer.
@@ -355,7 +407,7 @@ simple_effects_by_presentation %>% pairs()
 
 Given our latter result above we see that in the Standard presentation, scores based on Social lectures were significantly less than the other two.
 
-If we wanted to calculate any effect sizes for the parwise comparisons (corrected Cohen's D) we could use the function we learned last week. Again, ignore Computer as it was non-significant.
+If we wanted to calculate any effect sizes for the pairwise comparisons (corrected Cohen's D) we could use the function we learned last week. Again, ignore Computer as it was non-significant.
 
 ```{r}
 eff_size(object = simple_effects_by_presentation,

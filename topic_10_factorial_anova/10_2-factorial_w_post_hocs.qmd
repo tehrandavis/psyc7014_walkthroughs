@@ -5,7 +5,11 @@ title: 'Factorial ANOVA - Post hoc analysis of Main effects'
 In the last walkthrough, analyzed a 2×2 ANOVA focusing on our main effects. Because each of our factors only had two levels, there was no need to follow up on significant main effects with pairwise post hoc analysis. In this walkthough we will take a look at examples where our main effects have 3 or more levels, and demand a post-hoc analysis. For now, let's try another example. First let's bring in the necessary packages:
 
 ```{r}
-pacman::p_load(psych, tidyverse, cowplot, emmeans, ez)
+pacman::p_load(tidyverse, 
+               cowplot, 
+               emmeans, 
+               rstatix,
+               ez)
 ```
 
 ## Example: A 2 × 3 ANOVA
@@ -18,7 +22,7 @@ Thirty-six college students were randomly assigned to 3 groups (N=12). Students 
 
 The lectures were presented in two manners
 
--   **1 =** via computer
+-   **1** = via computer
 
 -   **2** = standard method, lecturer in a lecture hall
 
@@ -36,10 +40,10 @@ summary(dataset_no_inter)
 
 ### Building the ANOVA model
 
-I'm going to use `lm()`.
+I'm going to use `aov()`.
 
 ```{r}
-aov_model <- lm(Score~Presentation + Lecture, data = dataset_no_inter)
+aov_model <- aov(Score~Presentation + Lecture, data = dataset_no_inter)
 ```
 
 ### Testing assumptions
@@ -55,16 +59,17 @@ aov_model %>% performance::check_normality()
 aov_model %>% performance::check_homogeneity()
 ```
 
-The model checks both for normality of residuals but fails homogeneity of variance. Following upon given the robustness of ANOVA (3x rule):
+The model checks both for normality of residuals but fails homogeneity of variance. Following upon given the robustness of ANOVA (3x rule). I'm just going to construct a summary table of the variances `var()` that includes the mean value of the group, its variance, and the variance ratio (dividing each variance by the minimum value - in this case 7.467). What I'm looking fo in this instance is that no observed ratios are greater than 3.
 
 ```{r}
 dataset_no_inter %>% 
   group_by(Lecture, Presentation) %>%
   summarise(mean = mean(Score),
-            var = var(Score))
+            var = var(Score)
+            )
 ```
 
-Potential issues, but moving on.
+Potential issues, but, for now, moving on.
 
 ### Interaction plot
 
@@ -72,7 +77,7 @@ Let's plot the data. You'll note in this plot I'm adding some code to get it int
 
 ```{r}
 # setting original parameters
-p <- ggplot2::ggplot(data = dataset_no_inter, mapping=aes(x=Lecture,y=Score,group=Presentation))
+p <- ggplot(data = dataset_no_inter, mapping=aes(x=Lecture,y=Score,group=Presentation))
 
 # making a basic line plot
 line_p <- p + stat_summary(geom="pointrange",fun.data = "mean_se", size=0.75, position=position_dodge(.25), aes(shape=Presentation)) + 
@@ -95,13 +100,14 @@ show(line_p)
 ### Testing the ANOVA
 
 ```{r}
-aov_model %>% sjstats::anova_stats() %>% 
-  select("term","df","statistic","p.value","partial.etasq")
+aov_model %>% rstatix::anova_test(effect.size = "pes")
 ```
 
 ## post hoc analysis
 
-Admittedly, moving on to this step will ultimately be qualified by the presence of interactions (next week). For now, note that if you don't have an interaction, you may simply proceed to run post-hoc analyses on any significant main effects in the manner you would with a One-way ANOVA. Easy, peasy, right. One thing to note, you need to make the appropriate multiple comparison corrections. For example, returning to our data with no interaction, we need to test for differences in both the `Lecture` and `Presentation` main effects.
+Admittedly, moving on to this step will ultimately be qualified by the presence of interactions (next week). For now, note that if you don't have an interaction, you may simply proceed to run post-hoc analyses on any significant main effects in the manner you would with a One-way ANOVA. Easy, peasy, right. One thing to note, you need to make the appropriate multiple comparison corrections. R
+
+eturning to our data with no interaction, we need to test for differences in both the `Lecture` and `Presentation` main effects.
 
 -   Presentation: This one is easy. We only have two levels of `Presentation`, so the omnibus $F$ test tells us that our two groups are different. Nothing else to do here other than note which mean (Computer v. Standard) is greater than the other.
 
@@ -114,30 +120,35 @@ For example, to run a Tukey, you need call your ANOVA model. For the sake of cla
 Here I'm saving it to the object `aov_model`:
 
 ```{r}
-aov_model <- lm(Score~Presentation + Lecture, data = dataset_no_inter)
+aov_model <- aov(Score~Presentation + Lecture, data = dataset_no_inter)
 ```
 
-From here you may call upon the `emmeans()` function to derive your posthocs. By itself, `emmeans` produces the means by levels of the IV(s) listed in its `spec=` argument. It takes the `lm()` model as a first argument, and the IVs of interest as the second.
+From here you may call upon the `emmeans()` function to derive your posthocs. By itself, `emmeans` produces the means by levels of the IV(s) listed in its `spec=` argument. It takes the `aov()` model as a first argument, and the IVs of interest as the second.
 
 ```{r}
-# input your model into the emmeans,
-# interested in Lecture
+# input your model into the emmeans to create an emm_mdl
 
-emmeans(aov_model,specs = ~Lecture)
+emm_post_hocs <- emmeans(aov_model,specs = ~Lecture)
 ```
 
-`emmeans()` alone gives us the estimated marginal means for each of our levels, to run a post-hoc comparison we then pipe it into `pairs()` and include the `p value` adjustment that we would like to make. allows another method for making contrasts (planned and posthoc). If you want to perform a Tukey test follow this procedure you can simply pipe the previous (or save to an object and submit) to `pairs()`:
+`emmeans()` alone gives us the estimated marginal means for each of our levels:
 
 ```{r}
-emmeans(aov_model,specs = ~Lecture) %>% pairs(adjust="tukey") 
+emm_post_hocs
 ```
 
-In this case it appears that our Tukey does reveal differences between means, when performance of those getting Physical Science Lectures is greater than both History and Social, but Social and History are not difference from one another.
+to run a post-hoc comparison we then pipe it into `pairs()` and include the `p value` adjustment that we would like to make. If you want to perform a Tukey test follow this procedure you can simply pipe the previous (or save to an object and submit) to `pairs()`:
+
+```{r}
+emm_post_hocs %>% pairs(adjust="tukey") 
+```
+
+In this case it appears that our Tukey does reveal differences between means, when performance of those getting Physical Science Lectures is greater Social. However, no other pairwise differences are present.
 
 Note that you may call other p-value adjustments using these methods:
 
 ```{r}
-emmeans(aov_model,specs = ~Lecture) %>% pairs(adjust="bonferroni")
+emm_post_hocs %>% pairs(adjust="bonferroni")
 ```
 
 ## What about planned contrasts?
@@ -151,19 +162,31 @@ We can run planned contrasts using `emmeans()` as well. In this case, we need to
 First we need to obtain the `emmeans()` of the model including all cells (all factors). Using `aov.model` from the previous example:
 
 ```{r}
-emmeans(aov_model, specs = ~Lecture+Presentation)
+emm_planned <- emmeans(aov_model, specs = ~Lecture+Presentation)
 ```
 
-OK. From here let's build two custom contrasts. First, let's do the `Lecture` contrast on the main effect. In this case let's assume I want to contrast `Phys` with the combined other two conditions. Using the output above, I identify which rows contain `Phys` and I ensure that the summation of those rows is 1. In this case there are two rows, the first and the fourth, and each gets `0.5`. My remaining conditions must also equal `-1`. In this case there are four, so each is `-0.25`. Following the output above, then my contrast matrix is:
+OK. From here let's build two custom contrasts. First, let's do the `Lecture` contrast on the main effect. In this case let's assume I want to contrast `Phys` with the combined other two conditions. Let's take a look at the output of the `emm` that we just created above:
 
 ```{r}
-lecture_contrast <- list( "Phys v. Soc + Hist" = c(.5,-.25,-.25,.5,-.25,-.25))
+emm_planned
+```
+
+
+Using the output above, I identify which rows in the output contain `Phys`. In this case they are the 1st and 4th rows, Next I ensure that the summation of those rows is 1, so each gets `0.5`. My remaining conditions must also equal `-1`. In this case there are four, so each is `-0.25`. Following the output above, then my contrast matrix is (writing elongated to emphasize the relationship between the codes and the rows above)::
+
+```{r}
+lecture_contrast <- list( "Phys v. Soc + Hist" = c(.5, # 1st row = Phys
+                                                   -.25, # 2nd row = Soc
+                                                   -.25, # 3rd row = Hist
+                                                   .5, # etc
+                                                   -.25,
+                                                   -.25))
 ```
 
 From here I simply call `contrast()` with my contrast matrix as an argument. So the entire pipe goes from:
 
 ```{r}
-emmeans(aov_model, specs = ~Lecture + Presentation) %>% contrast(lecture_contrast)
+emm_planned %>% contrast(lecture_contrast)
 ```
 
 Assuming I wanted to perform a set of orthogonal contrasts:
@@ -179,20 +202,20 @@ contrast_matrix <- list("Phys v. Soc + Hist" = c(.5,-.25,-.25,.5,-.25,-.25),
                         )
 
 # run the contrasts
-emmeans(aov_model, specs = ~Lecture + Presentation) %>% contrast(contrast_matrix)
+emm_planned %>% contrast(contrast_matrix)
 ```
 
 In both cases, my p-values are unadjusted. I can add an adjustment to the `contrast()` argument like so:
 
 ```{r}
 # tukey is most common
-emmeans(aov_model, specs = ~Lecture + Presentation) %>% contrast(contrast_matrix, adjust = "tukey")
+emm_planned %>% contrast(contrast_matrix, adjust = "tukey")
 
 # or bonferroni is most conservative
-emmeans(aov_model, specs = ~Lecture + Presentation) %>% contrast(contrast_matrix, adjust = "bonferroni")
+emm_planned %>% contrast(contrast_matrix, adjust = "bonferroni")
 
 # or holm is more liberal
-emmeans(aov_model, specs = ~Lecture + Presentation) %>% contrast(contrast_matrix, adjust = "holm")
+emm_planned %>% contrast(contrast_matrix, adjust = "holm")
 ```
 
 ## More examples: a 3 × 3 ANOVA
@@ -220,7 +243,7 @@ dataset
 
 ```{r}
 # line plot
-ggplot(data = dataset, mapping=aes(x=Smkgrp,y=score,group=Task)) +
+ggplot(data = dataset, mapping=aes(x=Smkgrp,y=score,group=Task, shape = Task)) +
   stat_summary(geom="pointrange",
                fun.data = "mean_cl_normal", 
                position=position_dodge(.5)) + 
@@ -240,7 +263,7 @@ Another way of viewing this is that scores on the Cognitive task tended to be gr
 As before we can build our ANOVA model and test it against the requisite assumptions:
 
 ```{r}
-aov_model <- lm(score~Smkgrp+Task,data = dataset)
+aov_model <- aov(score~Smkgrp+Task,data = dataset)
 ```
 
 ```{r}
@@ -255,11 +278,10 @@ aov_model %>% performance::check_homogeneity()
 As in the last walkthrough we'll ignore the issues with our assumption checks
 
 ```{r}
-aov_model %>% sjstats::anova_stats() %>%
-  dplyr::select(c("term","df","statistic","p.value","partial.etasq"))
+aov_model %>% rstatix::anova_test(effect.size = "pes")
 ```
 
-Here we have significant main effects for `Smkgrp` and `Task`. We'll need to run seperate post-hoc analyses for each of our observed effects (given that both factors have 3 levels). Before moving on, I would recommend writing out the main points of this table to refer to later in your write up.
+Here we have significant main effects for `Smkgrp` and `Task`. We'll need to run separate post-hoc analyses for each of our observed effects (given that both factors have 3 levels). Before moving on, I would recommend writing out the main points of this table to refer to later in your write up.
 
 > -   main effect for Task, $F$ (2, 130) = 125.40, $p$ \< .001, $n_p^2$ = .66.
 >
@@ -270,29 +292,32 @@ Here we have significant main effects for `Smkgrp` and `Task`. We'll need to run
 ### Task
 
 ```{r}
-main_effect_Task <- emmeans(aov_model, ~Task) %>% pairs(adjust="tukey")
-
-main_effect_Task
+main_effect_Task <- emmeans(aov_model, ~Task)
+main_effect_Task  %>% pairs(adjust="tukey")
 ```
 
-The results confirm that overall, Cognitive task performance was greater than the other two conditions. To get the descriptive stats for these contrasts, we can use `summarySE`, only specifying `Task` as our grouping viariable:
+The results confirm that overall, Cognitive task performance was greater than the other two conditions. To get the descriptive stats for these contrasts, we can use `rstatix::get_summary`, only specifying `Task` as our grouping variable:
 
 ```{r}
-Rmisc::summarySE(data = dataset, measurevar = "score", groupvars = "Task")
+dataset %>%
+  group_by(Task) %>%
+  get_summary_stats(score, type = "mean_se")
 ```
 
 ### Smkgrp
 
 ```{r}
-main_effect_Smkgrp <- emmeans(aov_model, ~Smkgrp) %>% pairs(adjust="tukey")
+main_effect_Smkgrp <- emmeans(aov_model, ~Smkgrp)
 
-main_effect_Smkgrp
+main_effect_Smkgrp %>% pairs(adjust="tukey")
 ```
 
-and to get these descriptive stats, we run `summarySE` using only `Smkgrp` as our grouping variable:
+and to get these descriptive stats, we run do the same as above, only with `Smkgrp` as our grouping variable:
 
 ```{r}
-Rmisc::summarySE(data = dataset, measurevar = "score", groupvars = "Smkgrp")
+dataset %>%
+  group_by(Smkgrp) %>%
+  get_summary_stats(score, type = "mean_se")
 ```
 
 ## Example write up

@@ -89,10 +89,12 @@ book:
     - part: "Part 11: REPEATED MEASURES ANOVA"
       chapters:
         - topic_11_repeated_measures_anova/11_1-afex_ANOVA.qmd 
-        - topic_11_repeated_measures_anova/11_2-repeated_measures_anova.qmd 
-        - topic_11_repeated_measures_anova/11_3-factorial_rma.qmd 
-        - topic_11_repeated_measures_anova/11_4-sphericity.qmd 
-        - topic_11_repeated_measures_anova/11_5-spss_rma.qmd
+        - topic_11_repeated_measures_anova/11_2-repeated_measures_anova.qmd
+        - topic_11_repeated_measures_anova/11_3_plotting_rm_designs.qmd
+        - topic_11_repeated_measures_anova/11_4-factorial_rma.qmd
+        - topic_11_repeated_measures_anova/11_5-sphericity.qmd
+                
+
   
 
     

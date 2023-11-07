@@ -1,0 +1,232 @@
+---
+title: "Factorial RM-ANOVA and simple effects"
+---
+
+Let's ramp-up the complexity. Here is a dataset testing Recall over three days as a function of depth of processing (Lo, Med, High). In this case we have two within factors.
+
+## loading in the necessary packages and data:
+
+```{r}
+pacman::p_load(tidyverse,
+               afex,
+               cowplot,
+               emmeans)
+
+source("http://tehrandav.is/courses/statistics/custom_functions/withinSummary.R")
+
+factorial_df <- read_csv("http://tehrandav.is/courses/statistics/practice_datasets/withinEx3.csv")
+
+factorial_df
+```
+
+One thing to note is that **Subject** is being treated as a \<dbl\> number. It should be treated as a factor.
+
+```{r}
+factorial_df$Subject <-  as.factor(factorial_df$Subject)
+```
+
+## plotting the data
+
+### individual subjects plots: Spaghetti
+
+Since I have two factors here, one strategy may be to **facet** my spaghetti plots. In this case I am creating separate spaghetti plots for each level of **ProcessDepth:**
+
+```{r}
+p <- ggplot(data = factorial_df, aes(x=Day, y=Recalled, group = Subject)) +
+  geom_point(aes(col=Subject)) + 
+  geom_line(aes(col=Subject)) +
+  facet_wrap(~ProcessDepth)
+
+plotly::ggplotly(p)
+```
+
+FWIW, on thing that this plot has clued me in on is that the order of my **Processing Depth** levels is High, Lo, Med. I might actually want that to be Lo, Med, High:
+
+```{r}
+factorial_df$ProcessDepth <- fct_relevel(factorial_df$ProcessDepth, 
+                                     c("Lo","Med","High")
+                              )   
+```
+
+and now re-plotting...
+
+```{r}
+p <- ggplot(data = factorial_df, aes(x=Day, y=Recalled, group = Subject)) +
+  geom_point(aes(col=Subject)) + 
+  geom_line(aes(col=Subject)) +
+  facet_wrap(~ProcessDepth)
+
+plotly::ggplotly(p)
+```
+
+### means plots
+
+Again, we need to make the appropriate correction for our error bars. In this case the number of within groups is the number of cells that is formed by crossing Day (1,2,3) and Processing Depth (Lo, Med, Hi). As this is a 3 \* 3 design there are 9 cells, or `nWithinGroups=9`. As before this is handled auto-magically in `summarySEwithin2`.
+
+```{r}
+plot_table <- summarySEwithin2(data=factorial_df,
+                                  measurevar = "Recalled",
+                                  withinvars = c("Day","ProcessDepth"),
+                                  idvar = "Subject")
+
+
+ggplot(plot_table, aes(x = Day, y = Recalled, group=ProcessDepth)) +
+  geom_point(size=2.5, aes(shape = ProcessDepth)) + 
+  geom_line(size=1, aes(linetype=ProcessDepth)) +
+  geom_errorbar(aes(ymin=Recalled-se, ymax=Recalled+se), width=0.1) +
+  theme_cowplot() +
+  theme(
+    axis.title = element_text(size = 16, face = "bold", lineheight = .55),
+    axis.text = element_text(size = 12),
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.position = c(.25,.75)) +
+  scale_color_manual(values=c("black","grey50")) + 
+  xlab("Lecture") + 
+  ylab ("Score") +
+  theme(plot.margin=unit(c(.25,.25,.25,.25),"in")) + 
+  
+  # stack legend boxes horizontally:
+  theme(legend.box = "horizontal")
+```
+### rain cloud plot
+
+Here's how we might construct a rain cloud plot for this. For what's its worth, this took a lot of trial and error to get the positioning right. I'd only do this for plots you intend to share with the world. Also note, I'm including the `viridis` package here (including `scale_fill_viridis`). This is a package that provides a color palette that is colorblind friendly. See [here](https://cran.r-project.org/web/packages/viridis/vignettes/intro-to-viridis.html) for more information.
+
+```{r}
+pacman::p_load(ggrain, ggpp, sdamr, viridis)
+
+ggplot(data = factorial_df, aes(x = Day, y=Recalled, fill = ProcessDepth, color = ProcessDepth)) +
+  geom_rain(
+            violin.args = list(alpha = .3 ),
+            violin.args.pos = list(
+              position = ggpp::position_jitternudge(width = .0, x = .2),
+              side = "r"),
+            boxplot.args = list(outlier.shape = NA, color = "black", width = .25),
+            boxplot.args.pos = list(
+              position = ggpp::position_dodgenudge(x = 0)),
+            point.args = list(alpha = .3),
+            point.args.pos = list(
+              position = sdamr::position_jitternudge(jitter.width = .1, nudge.x = -.25)
+              )
+            ) +
+  theme_cowplot() +
+  scale_fill_viridis(discrete = T) +
+  guides(fill = "none")
+```
+
+
+## running the omnibus ANOVA:
+
+```{r}
+omnibus_aov <- afex::aov_ez(id = "Subject", 
+                            dv = "Recalled", 
+                            data = factorial_df,
+                            within = c("ProcessDepth","Day")
+                            )
+                            
+
+# alternative using aov_car
+
+# omnibus_aov <- afex::aov_car(Recalled ~ ProcessDepth * Day + Error(Subject/(ProcessDepth*Day)),
+#                              data = factorial_df)
+```
+
+And now to check for spherecity...
+
+```{r}
+performance::check_sphericity(omnibus_aov) %>% print()
+```
+
+Everything seems ok so no correction necessary
+
+```{r}
+anova(omnibus_aov, es = "pes", correction = "none")
+```
+
+Here we have two main effects and an interaction. Let's unpack the interaction by taking a look at whether `Recall` increases over successive days.
+
+## running the simple effects ANOVAs
+
+The Cohen chapter assigned this week recommends that **one avoid the use of pooled error terms when performing simple effects analysis of within-subjects ANOVA**. This is definitely the case when the spherecity assumption is violated, but as a general rule, even when the assumption is not technically violated, deviations from spherecity can artificially inflate Type I error. So in this case, simple follow up ANOVAs that refer to their own error terms are justified. That said as Type I error goes down, Type II goes up. Something to consider.
+
+Something else to consider---remember this little tidbit from earlier:
+
+> \[...\] for within-subjects (or repeated measures) effects, the error term is the Treatment x Subjects interaction, and the nature of the TxS interaction across all treatment levels can be very different than it is for any particular pair of treatment levels.
+
+This applies to simple effects ANOVA as well.
+
+This can be accomplished using `joint_tests()` from `emmeans` telling it how we want to separate our original model. As before, we need to add `model="multivariate"` to our call (this tells `R` to use the simple effects error term and not the omnibus).
+
+```{r}
+joint_tests(omnibus_aov, by = "ProcessDepth", model="multivariate")
+```
+
+#### a note on Univariate v. Multivariate methods
+
+You might be asking yourself "why `multivariate` in the model argument above?" Briefly, univariate v. multivariate statistical methods refer to the number of dependent variables associated with the model per fundamental unit of analysis. In psychology research the fundamental unit of analysis is typically the participant---measures are taken at the level of the participant. A univariate model has one dependent variable whereas a multivariate method has two or more per participant. Perhaps some of you are more familiar with this distinction in the context on One-way MANOVA... which analyzes two or more dependent variables simultaneously in an ANOVA design. MANOVA (multivariate ANOVA) is sometimes preferred to running separate univariate ANOVAs if one believes that the dependent variables involved are somehow correlated with one another. In this case MANOVA factors these correlations into the model testing the IVs.
+
+I bring all of this up as one way to conceptualize repeated-measures ANOVA is as multivariate method. Multiple measures are taken at the level of the participant. Specifying `multivariate` tells `R` to consider this case and therefore treat subsequent simple effects ANOVA accordingly.
+
+### post-hoc tests
+
+Given that we find an effect for `Day` on the `High` and `Med` `ProcessDepth` we need to perform post-hoc follow-ups. Again let's specify `model = "multivariate":`
+
+```{r}
+post_hoc_tests <- emmeans(omnibus_aov, 
+        by = "ProcessDepth", 
+        specs = ~ Day, 
+        model="multivariate", 
+        adjust="tukey")
+
+post_hoc_tests %>% pairs(adjust="tukey")
+```
+
+Remember from this table we should only focus on `ProcessDepth = Med` and `ProcessDepth = High`.
+
+## Writing this up
+
+... To test this hypothesis we ran a 3 (Process Depth) × 3 (Day) repeated-measures ANOVA. Where there were violations of spherecity, we used Greenhouse-Geisser corrected degrees of freedom. This analysis revealed a significant interaction, $F$(2.86, 25.78) = 10.64, $p$ \< .001, $\eta_p^2$ = .54. To test this interaction we ran seperate simple effects ANOVA for Day on each level of Process Depth. A simple effect for Day was found on High processing depth, $F$(2, 9) = 32.05, $p$ \< .001, where there were statistically significant increases in performance from each Day to the next (Tukey HSD, $p$ \< .05). A simple effect for Day was also found on Med processing depth, $F$(2, 9) = 30.15, $p$ \< .001. While scores increased across the 3 days, only Day 3 was significantly greater than the other two ($p$s \< .05). No simple effect was observed for Day in the Lo processing depth condition.
+
+See the next walkthrough for how to do this in SPSS.
+
+## Epilouge: throwing caution to the wind (yikes)
+
+### Assuming spherecity (not recommended)
+
+What if we said, "screw it" and we wanted to throw Cohen's caution to the wind and use the error terms from the omnibus ANOVA. After all, this gives us more **power, pow-ah, pow-ahhhh!**
+
+We'll given how we've specificied the model, we would need to do two things. First, we would need to re-build our model, specifying that we desire the output to include an `aov` object (an annoying but necessary step here):
+
+```{r}
+omnibus_aov <- afex::aov_ez(id = "Subject", 
+                            dv = "Recalled", 
+                            data = factorial_df,
+                            within = c("ProcessDepth","Day"),
+                            include_aov = TRUE
+                            )
+
+# alternative using aov_car
+
+# omnibus_aov <- afex::aov_car(Recalled ~ ProcessDepth * Day + Error(Subject/(ProcessDepth*Day)),
+#                              data = factorial_df, 
+#                              include_aov = TRUE)
+```
+
+Then would simply run the simple effects tests with a `univariate` model. Note that this method attempts to deal with potential violations of our spherecity assumptions by using Satterthwaite degrees of freedom. Keep in mind, we are less protected from Type 1 error in this case.
+
+```{r}
+joint_tests(omnibus_aov, by = "ProcessDepth", model="univariate")
+```
+
+As a follow up we would run the pairwise tests using the `univariate` model (pooled error term):
+
+```{r}
+post_hoc_tests <- emmeans(omnibus_aov, 
+        by = "ProcessDepth", 
+        specs = pairwise ~ Day, 
+        model="univariate", 
+        adjust="tukey")
+
+post_hoc_tests %>% pairs(adjust="tukey")
+```
+That said, I would not recommend using this method.

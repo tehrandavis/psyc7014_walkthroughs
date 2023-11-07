@@ -1,4 +1,16 @@
 /* css styles */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+
+@font-face {
+    font-family: 'Cal Sans';
+    src: url('/fonts/CalSans-SemiBold.woff2') format('woff2'),
+         url('/fonts/CalSans-SemiBold.woff') format('woff');
+
+    /* Add more formats for better browser compatibility */
+  }
+
+
 pre sourceCode {
     font-size: 13px; /* Adjust the value to your preferred font size */
     white-space: pre-wrap;
@@ -23,4 +35,9 @@ pre sourceCode {
 .cell {
   font-size: 12px; /* Adjust the value to your preferred font size */
   white-space: pre-wrap;
+}
+
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-family: "Cal Sans", Poppins, sans-serif;  
+  font-weight: bold;
 }

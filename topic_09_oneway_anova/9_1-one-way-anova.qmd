@@ -253,37 +253,42 @@ Looks like in this example, we may still have an issue. For now I'm going to ign
 
 ## Running the ANOVA in R using `aov()` or `lm()`
 
-There are many, many ways to build an ANOVA model in `R`. Throughout the semester we will be highlighting three: `lm()`, `aov()`, and using the `afex` package. This week we will concentrate on `aov()` which is the standard method, as well as the `lm()` method that you have used before, just to reinforce that ANOVA and regression are one in the same. In fact, SPOILER ALERT, `aov()` is just a fancy wrapper for `lm()`, AND FWIW I don't really like using `aov()`. I only mention it here as if you go looking for how to run ANOVA in `R` online, many sites will say use `aov()`.
+There are many, many ways to build an ANOVA model in `R`. This week we will concentrate on `aov()` which is the standard method, as well as the `lm()` method that you have used before, just to reinforce that ANOVA and regression are one in the same. In fact, SPOILER ALERT, `aov()` is just a fancy wrapper for `lm()`.
 
 Like `lm()` from weeks past, `aov()` asks us to enter our dependent and independent variables into the model in the formula format **DV \~ IVs**. In this case, we only have a single IV, `GROUP_FACTOR`. Thus our model is:
 
 ```{r}
-aov.model <- aov(RECALL~GROUP_FACTOR,data = dataset)
+aov_model <- aov(RECALL~GROUP_FACTOR,data = dataset)
 ```
 
-From here, an `anova()` of the model gives us our ANOVA table. Note that `car::Anova()` accomplished the same thing, though gives us a different format. The added benefit is that if we so choose, we can change how our Sums of Squares are calculated. This isn't important for simple One-way ANOVA, but see the Field text, Jane Superbrain 11.1 for an explanation.
+From here, we can use the `anova()` function to give us our ANOVA table. 
 
 ```{r}
-anova(aov.model)
-car::Anova(aov.model, type="3")
+anova(aov_model)
 ```
 
-We can also get our effect sizes from the `aov.model` using `eta_squared()` from the `rstatix` package. Note that this is the same as the $\eta^2$ value from the ANOVA table above.
+Note however that this output is fairly limited. Yes, it give us our $F$ value and many of the crucial relevant statistics, but notably it does not provide us with our effect size. Instead, we can use a function from the `rstatix` package. This has two added benefits:
+
+  1. it gives us an effect size measure and 
+  2. it also allows us to adjust how our Sums of Squares are calculated. This isn't important for simple One-way ANOVA, but see the Field text, Jane Superbrain 11.1 for an explanation.
+  
+Here is an example. Note that we are using the `type = 3` argument to specify the type of SS calculation we want. This is the default for `rstatix::anova_test()`. I'm also specifying that I want general eta squared $\eta^2$ as my effect size measure.
 
 ```{r}
-rstatix::eta_squared(aov.model)
+rstatix::anova_test(aov_model, type = 3, effect.size = "ges")
 ```
 
-FWIW... a super-duper comprehensive anova table can be obtained by submitting our `aov.model` to `sjstats::anova_stats()`, which gives us our effect sizes as well! This function calculates eta-squared ($\eta^2$), partial-eta-squared ($\eta_p^2$), omega squared ($\omega^2$) and partial omega-squared ($\omega_p^2$) as well as Cohen's *f*. Typically for One-Way ANOVA psychologists report eta-squared ($\eta^2$), though there are arguments that omega squared ($\omega^2$) may be the more preferred measure. 
+FWIW... a super-duper comprehensive anova table can be obtained by submitting our `aov_model` to `sjstats::anova_stats()`, which gives us our effect sizes as well! This function calculates eta-squared ($\eta^2$), partial-eta-squared ($\eta_p^2$), omega squared ($\omega^2$) and partial omega-squared ($\omega_p^2$) as well as Cohen's *f*. Typically for One-Way ANOVA psychologists report eta-squared ($\eta^2$), though there are arguments that omega squared ($\omega^2$) may be the more preferred measure. 
 
 ```{r}
 pacman::p_load(kableExtra)
 pacman::p_load(sjstats)
-sjstats::anova_stats(aov.model) %>% 
+sjstats::anova_stats(aov_model) %>% 
   kbl(caption = "Super ANOVA table") %>%
   kable_classic(full_width = F, html_font = "Cambria")
 ```
 
+I typically don't recommend using `sjstats::anova_stats()` unless you are looking for these more exotic effect sizes.
 
 ## Plotting your data
 
@@ -333,12 +338,12 @@ That being said, this data probably lends itself to a bar plot. This is similar 
 
 ## Reporting your data / the write up
 
-There are two components to reporting your omnibus ANOVA. First, You need to report your output as related to the test:
+There are two components to reporting your one-way ANOVA. First, You need to report your output as related to the test:
 
 -   **the F value**,
 -   **the degrees of freedom (between and within)**,
 -   **the p-value**
--   **effect size**: typically with between-effects ANOVA we report eta squared, although note that Howell advocates for omega squared. Recall that submitting the model to `sjstats::anova_stats()` gives you both.
+-   **effect size**: typically with between-effects ANOVA we report eta squared.
 
 Second, as we typically focus on means with ANOVA, it is typically a good idea to report means and some report of of the distribution of each group (typically either standard deviation or standard error; although 95% CI may be useful in certain scenarios).
 
@@ -347,7 +352,7 @@ So for example reporting the `Rhyming` group:
 -   **M ± SD:** 6.90 ± 2.13
 -   **M ± SE:** 6.90 ± 0.67
 
-## What the omnibus ANOVA tells you
+## What the one-way ANOVA tells you
 
 While it may be useful to report the means, you need to be mindful of what the omnibus ANOVA tells you. Remember, that the the null hypothesis of the omnibus ANOVA is that "there are no differences between observed means". Our significant result tells us that there *are* differences between our means, **but does not tell us what those specific differences are**. So while it may be useful to report general relationships, e.g., "Recall for people in the Intentional group tended to be greater than for the Counting group" you **cannot** say definitively "Recall was significantly greater for the Intentional Group". Typically when you only have tested the omnibus ANOVA, you only speak in generalities (e.g., "Recall tended to increase with level of processing.")
 
@@ -357,11 +362,11 @@ While it may be useful to report the means, you need to be mindful of what the o
 
 Now that we've got practical matters out of the way, I want to take some time to dig a little deeper into the connections between ANOVA this week and our work on correlations and regressions in the past.
 
-As we've already mentioned (and spent time discussing in class) ANOVA is just an extension of the simple linear model that we covered last week, where ANOVA is used when our predictors are discrete. In fact `aov()` is simply a wrapper for the `lm()` function that we used last week. For example, let's run our model using `lm()` and then pipe it into `anova()` or `sjstats::anova_stats()`.
+As we've already mentioned (and spent time discussing in class) ANOVA is just an extension of the simple linear model that we covered last week, where ANOVA is used when our predictors are discrete. In fact `aov()` is simply a wrapper for the `lm()` function that we used last week. For example, let's run our model using `lm()` and then pipe it into `rstatix::anova_test()`.
 
 ```{r}
-lm.model <- lm(RECALL~GROUP_FACTOR, data=dataset)
-anova(lm.model)
+lm_model <- lm(RECALL~GROUP_FACTOR, data=dataset)
+rstatix::anova_test(lm_model)
 ```
 
 All `aov()` does is take an `lm` object and produce an ANOVA table from the results. If we were simply to look at the `lm() model` we see that it gives us the info in our ANOVA table at the end of the summary, including the `F-statistic` (9.085), the `degrees of freedom` (4 and 45) and the `p-value` (1.815e-05):
@@ -401,21 +406,15 @@ Given our example:
 -   GROUP_FACTOR is our independent variable, with five levels (or groups).
 
 ```{r}
-anova(aov.model)
+rstatix::anova_test(aov_model, effect.size = "ges")
 ```
 
 From this table, we need our:
 
 -   **df**: 4 and 45
 -   **F-statistic**: 9.085
--   **p.value**: even though it says zero, its "\<.001"
-
-And we can also get our effect size:
-
-```{r}
-rstatix::eta_squared(aov.model)
-```
-
+-   **p.value**:  <.001
+-   **ges**: .45
 
 Taking all of this info, and plugging into a write-up template (inserted points in bold):
 

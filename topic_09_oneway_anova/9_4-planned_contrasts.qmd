@@ -22,7 +22,7 @@ pacman::p_load(agricolae,
 1.  Be sure that the column that contains your IV is indeed being treated as a factor. If it is `levels(IV)` will list your levels, also the column containing the IV will contain `<fct>`. If not `mutate()` as column with your IV as a factor, ex: `newCol = factor(oldCol)`
 2.  check the order of your IV using `levels()`. If you need to reorder, use `fct_relevel()`
 3.  create your contrast matrix according to the levels obtained in Step 1
-4.  build an ANOVA model using `lm()`, `aov()`, or `afex()` (output to lm)
+4.  build an ANOVA model
 5.  run your contrasts using `emmeans()`, inputting
 
 -   your ANOVA model from Step 3
@@ -65,7 +65,7 @@ my_contrasts <- list("MS v. MM" = contrast1,
                      )
 
 # Step 3
-morphine_mdl <- lm(Time~Group_fct, data = dataset) 
+morphine_mdl <- aov(Time~Group_fct, data = dataset) 
 
 # Step 4
 emmeans(object = morphine_mdl,specs = ~Group_fct, adjust="bonf") %>% 
@@ -88,7 +88,7 @@ If you have reasons to predict differences between particular sets of group mean
 
 ## Performing planned contrasts in R
 
-As outlined in both Winter and Field, planned contrasts begin by creating contrast weights. The idea with contrast weights is that the groups that are being compared should sum to equal -1 and +1 respectively, resulting in a null test against 0 (i.e. the two weighted means are equal). Any groups that are not being included in the comparison should be assigned weights of 0. You've already seen contrasts before, when looking at the `lm()` ANOVA output. We remarked that this output allows you to make a comparison of each group against the control group.
+As outlined in both Winter and Field, planned contrasts begin by creating contrast weights. The idea with contrast weights is that the groups that are being compared should sum to equal -1 and +1 respectively, resulting in a null test against 0 (i.e. the two weighted means are equal). Any groups that are not being included in the comparison should be assigned weights of 0. You've already seen contrasts before, when looking at the `aov()` ANOVA output. We remarked that this output allows you to make a comparison of each group against the control group.
 
 First let's load in the data and recode the factors:
 
@@ -158,12 +158,12 @@ When performing planned contrasts in `R` I recommend using the `emmeans` package
 
 **To perform the contrast requires 3 steps:**
 
--   run your omnibus ANOVA `lm()` model and save it as an object
--   input your `lm()` model into the `emmeans()` function, specifying the name of your IV and save it to an object
+-   run your omnibus ANOVA `aov()` model and save it as an object
+-   input your `aov()` model into the `emmeans()` function, specifying the name of your IV and save it to an object
 -   submit your `emmeans` object to the `contrasts()` function indicating what your contrasts are.
 
 ```{r}
-morphine_mdl <- lm(formula = Time~Group_fct,data = dataset)
+morphine_mdl <- aov(formula = Time~Group_fct,data = dataset)
 emm_mdl <- emmeans(morphine_mdl,specs = ~Group_fct)
 contrast(emm_mdl, method = list(contrast1))
 ```

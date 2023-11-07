@@ -18,7 +18,7 @@ pacman::p_load(agricolae,
 ```
 
 1.  Be sure that the column that contains your IV is indeed being treated as a factor. If it is `levels(IV)` will list your levels, also the column containing the IV will contain `<fct>`.
-2.  build an ANOVA model using `lm()`, `aov()`, or `afex()` (output to lm)
+2.  build an ANOVA model
 3.  run your post-hoc comparisions using the p.adjustment of your choice (tukey, holm, bonferroni)
 
 Example (I recommend running this line-by-line)
@@ -43,7 +43,7 @@ dataset <-
                                 McM = "5")
   )
 # Step 2: Run the model
-model_aov <- lm(Time~Group_fct, data = dataset)
+model_aov <- aov(Time~Group_fct, data = dataset)
 
 # Step 3: Test the model for significant F-value
 model_aov %>% anova()
@@ -123,39 +123,21 @@ ggplot(data = dataset,aes(x=Group_fct,y=Time)) +
 
 ## Running the One-way ANOVA
 
-Now that our data is properly coded we can run our omnibus ANOVA. My own personal preference is to run the ANOVA using `lm()`. This makes like a lot easier when dealing with contrasts, especially if you decide to employ the method that Field suggests in his guide. FWIW, I typically use another method as seen below, but I'll talk a little bit about why I prefer it to Fields method. That said, recall from Part 1 that using the `aov()` function gives you the same result. Depending on which you choose, you can use the `summary(morphine_mdl)` or `anova(morphine_mdl)` to switch back and forth to get the info that you desire. 
+Now that our data is properly coded we can run our omnibus ANOVA. For simple One-Way designs, my own personal preference is to run the ANOVA using `aov()`. The `aov()` function is able to handle most of the types of ANOVA that we encounter in this class (the same can't be easily said for `lm`), and it plays nicely with the `rstatix` library (the same can't be said for `afex` which used to be my preferred method). 
+
+This makes it a lot easier when dealing with contrasts, especially if you decide to employ the method that Field suggests in his guide. FWIW, I typically use another method as seen below, but I'll talk a little bit about why I prefer it to Fields method.
 
 ```{r}
 # running the ANOVA using lm:
-morphine_mdl <- lm(formula = Time~Group_fct,data = dataset)
+morphine_mdl <- aov(formula = Time~Group_fct,data = dataset)
 
-# anova table
-anova(morphine_mdl)
-
-# get effect size
-rstatix::eta_squared(morphine_mdl)
+# anova table with effect size
+rstatix::anova_test(morphine_mdl, effect.size = "ges")
 ```
-
 
 So we see here that we have: $F(4,35)=27.33,p<.001,\eta^2=.76$
 
-### More complete anova tables
-
-FWIW, in the example above we ran one function for the anova table and another for the effect size. R has many packages that will combine the two of them for you, including the `sjstats` package. For example `sjstats::anova_stats()` will give you a nice table with the ANOVA and effect size information, BUT it's probably a little too comprehensive. It give you a lot of information that you may not need, but is good if you elect to report more exotic effect sizes (e.g., omega squared, epsilonsq, etc.):
-
-```{r}
-sjstats::anova_stats(morphine_mdl)
-```
-
-For our purposes, `rstatix::anova_test()` provides a cleaner alternative. It gives you the ANOVA table, and effect sizes. It also gives you the option to specify the type of ANOVA that you want to run (e.g., Type II, Type III, etc., see Field text). For example:
-
-```{r}
-rstatix::anova_test(morphine_mdl, 
-                    effect.size = "ges", # general eta squared for one-way ANOVA
-                    type = 2) # type 2 is the default for R
-
-#FWIW type=3 is the default for SPSS, see ?rstatix::anova_test for more info
-```
+## Beyond ANOVA: pairwise mean comparisons
 
 Remember again that the **only** thing that the omnibus ANOVA tells us is that there is an inequality in our means. In this respect, the omnibus begs more questions than it answers---which means are different from which. In order to get this answer we need to run direct comparisons between our means. There are two ways of going about this, we can either *(1)* plan beforehand what differences in means are especially relevant for us and focus on those, or *(2)* take a look at all potential differences without any specified predictions. In Case 1, we are performing **planned contrasts**; in Case 2, we use **post hoc** tests. More often than not, you will see researchers analyzing differences in means using post hoc tests---that is they run the ANOVA, find that it is significant, and run a battery of pairwise comparisons. It is sometimes the case that of that battery of comparisons, only a select few are actually theoretically relevant. However, if there is a theory-driven case to be made that you are predicting differences between a few select means in your data, then there is an argument to be made that you should run your planned contrasts independent of your ANOVA. That is, you are technically only permitted to run post-hoc tests if your ANOVA is significant (you can only go looking for differences in means if your ANOVA tells you that they exist), whereas planned contrasts can be run regardless of the outcome of the omnibus ANOVA (indeed, some argue that they obviate the need to run the omnibus ANOVA altogether).
 
@@ -248,12 +230,12 @@ pairwise.t.test(x = dataset$Time, g = dataset$Group,p.adjust.method = "holm")
 
 ### Tukey HSD and REGWQ tests
 
-In order to run Tukey's HSD and REGWQ methods we call upon the `agricolae` package. In this case, we need to input our `lm() model` into the function, as well as identify our "treatment" (in this case our "Group" factor). For example:
+In order to run Tukey's HSD and REGWQ methods we call upon the `agricolae` package. In this case, we need to input our `aov() model` into the function, as well as identify our "treatment" (in this case our "Group" factor). For example:
 
 ### Tukey HSD example (agricolae)
 
 ```{r}
-morphine_mdl <- lm(Time~Group_fct,data = dataset) # from above
+morphine_mdl <- aov(Time~Group_fct,data = dataset) # from above
 agricolae::HSD.test(morphine_mdl,trt = "Group",group = T,console = T) 
 ```
 
@@ -281,7 +263,7 @@ Compact letter displays are nice (SPSS generates them, too), but as seems to alw
 
 > CLD displays promote visually the idea that two means that are "not significantly different" are to be judged as being equal; and that is a very wrong interpretation. In addition, they draw an artificial "bright line" between P values on either side of alpha, even ones that are very close.
 
-## Model-based comparisions using estimated marginal means
+## Model-based comparisions using estimated marginal means (perferred method)
 
 While pairwise $t$-tests are conceptually more simple, they possesses inherent limitations when we scale towards multifactorial experimental designs and wish to control for multiple comparisons, potentially inflating the Type I error rate. Model based comparisions, such as those provided by the `emmeans` package, are more flexible and allow for a greater degree of control over the comparisons that you wish to make by comparing means that are adjusted for covariates or other factors in the model (i.e., controlling for other factors in your model).
 
@@ -296,7 +278,7 @@ Let's use the `emmeans` package to perform our post-hoc analyses from above.
 We start by throwing our model into the `emmeans()` function, specifying our test as a function of our comparison. We also need to tell `R` what adjustment (correction) we desire. To remind ourselves, our model is:
 
 ```{r}
-morphine_mdl <- lm(formula = Time~Group_fct,data = dataset)
+morphine_mdl <- aov(formula = Time~Group_fct,data = dataset)
 ```
 
 For a comparision with a `bonferroni` correction we need to specify what factor (or predictor or IV) we are running our pairwise comparisons on (`spec =`), and that we are `adjusting` by using the bonferonni (`bonf`). This takes the general form:

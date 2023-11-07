@@ -1,0 +1,244 @@
+---
+title: "Plotting data with RM designs"
+editor: visual
+---
+
+One additional concern that we must deal with when plotting within-subjects data is the error bars. Plotting the standard error or regular confidence intervals may give a misleading representation of the variation of scores in each condition. This is because the values when normally calculated do not account for within subject correlation. How to address this has been the cause of some debate, see [Cousineau (2005)](https://doaj.org/article/dd17c4ccc4684c9da60c02f3864d09e6) and [Morey (2008)](https://doaj.org/article/011cd52c58b449c4bf169676ca704062).
+
+We'll walk through how do deal with this issue in this walkthrough.
+
+First, let's grab the packages and data from the last walkthrough:
+
+```{r}
+pacman::p_load(tidyverse,
+               rstatix,
+               cowplot,
+               performance,
+               emmeans,
+               afex,
+               see)
+
+example_data <- read_csv("http://tehrandav.is/courses/statistics/practice_datasets/withinEx2.csv")
+
+example_data$Subject <- as.factor(example_data$Subject)
+example_data$Lecture <- as.factor(example_data$Lecture)
+example_data
+```
+
+## Violin plots FTW
+
+If you are presenting a simple repeated measures design (e.g., very very factors × levels) then my general recommendation to combine the (uncorrected) mean and standard error bars with a violin plot or a rain cloud plot.
+
+### Means with half violins
+
+For now, let's just plot the means and standard error bars and add some nice half-violin plots (FWIW the good old fashion violins from earlier walkthroughs work well here as well). You'll need to call in the `ggdist` package for half violin plots.
+
+```{r}
+pacman::p_load(ggdist)
+
+
+ggplot(data = example_data, aes(x=Lecture, y=Score)) +
+  geom_violin(trim = F, fill = "lightgrey") + 
+  stat_summary(fun.data = "mean_se", size = .5) + 
+  theme_cowplot()
+```
+
+### Rain cloud plots
+
+We can also create raincloud plots using the `ggrain` package. A simple execution is below:
+
+```{r}
+pacman::p_load(ggrain)
+
+ggplot(data = example_data, aes(x=Lecture, y=Score)) +
+  geom_rain() +
+  theme_cowplot()
+```
+
+However I like to jazz these up to give them a little pop. Check out this page for all you can do with the `ggrain` package: [ggrain tutorial](https://www.njudd.com/raincloud-ggrain/).
+
+```{r}
+pacman::p_load(ggrain, ggpp, sdamr)
+
+ggplot(data = example_data, aes(x = Lecture, y=Score, fill = Lecture, color = Lecture)) +
+  geom_rain(id.long.var = "Subject",
+            violin.args = list(alpha = .3),
+            boxplot.args = list(outlier.shape = NA, color = "black"),
+            boxplot.args.pos = list(
+              position = ggpp::position_dodgenudge(x = .1), 
+              width = 0.1)
+            ) +
+  stat_summary(aes(color = Lecture, group = Lecture), fun.data = "mean_se",
+               position = sdamr::position_jitternudge(nudge.x = -.1, jitter.width = .1)) +
+  theme_cowplot() +
+  theme(axis.title.x = element_blank(), 
+        axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank()) +
+  guides(fill = "none")
+```
+
+You might even elect to have your conditions overlap (super level up):
+
+```{r}
+pacman::p_load(ggrain, ggpp, sdamr)
+
+ggplot(data = example_data, aes(x = 1, y=Score, fill = Lecture, color = Lecture)) +
+  geom_rain(
+            violin.args = list(alpha = .3),
+            boxplot.args = list(outlier.shape = NA, color = "black"),
+            boxplot.args.pos = list(
+              position = ggpp::position_dodgenudge(x = .1), 
+              width = 0.1)
+            ) +
+  stat_summary(aes(color = Lecture, group = Lecture), fun.data = "mean_se",
+               position = sdamr::position_jitternudge(nudge.x = -.1, jitter.width = .1)) +
+  theme_cowplot() +
+  theme(axis.title.x = element_blank(), 
+        axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank()) +
+  guides(fill = "none")
+```
+
+## Correcting the error bars
+
+That said, a slightly move involved method would be to to "correct" the standard error bars using a methods described by [Cousineau (2005)](https://doaj.org/article/dd17c4ccc4684c9da60c02f3864d09e6) and [Morey (2008)](https://doaj.org/article/011cd52c58b449c4bf169676ca704062).
+
+### What's going on here?!?!?
+
+Here, I'm simply presenting the practical steps for this correction. I don't expect you to do this "by hand" but just want to give you a feel for what's involved. This process begins with **norming** the data to account for within subjects correlations. This is done by dividing each score by the standard deviation of that participant's scores. This is done using the `normDataWithin` function in the `Rmisc` package.
+
+```{r}
+pacman::p_load(Rmisc)
+
+normedData <- Rmisc::normDataWithin(data = example_data,
+                                    measurevar = "Score",
+                                    idvar = "Subject", 
+                                    betweenvars = NULL)
+
+normedData
+```
+
+We then calculate the se, sd, and ci values of our normed data, in this case `ScoreNormed` in table above.
+
+The final step is to make a correction on these `Normed` values ([Morey (2008)](https://doaj.org/article/011cd52c58b449c4bf169676ca704062)). This is done by taking the number of levels of the within factor (`nWithinGroups`) and applying the following correction:
+
+```{r}
+# get the number of levels in Lecture:
+nWithinGroups <- nlevels(example_data$Lecture)
+
+# apply the correction factor:
+correctionFactor <- sqrt(nWithinGroups/(nWithinGroups - 1))
+```
+
+The range of our corrected errorbars are the sd, se, ci multiplied by this `correctionFactor`.
+
+For example, the `sd` of participants' `Score` in `Physical` is:
+
+```{r}
+sd(normedData$ScoreNormed[normedData$Lecture=="Physical"])*correctionFactor
+```
+
+Fortunately there is a function in `Rmisc` that handles this correction for us, `summarySEwithin`. It is very similar to the `summarySE` function you are familiar with, but asks you to specify which IVs are within-subjects (`withinvars`), between-subjects(`betweenvars`) and which column contains subject IDs `idvar`. Using our original `example_data` data:
+
+```{r}
+Rmisc::summarySEwithin(data=example_data,
+                       measurevar = "Score",
+                       withinvars = "Lecture",
+                       betweenvars = NULL, 
+                       idvar = "Subject")
+```
+
+Unfortunately, to date I haven't found a way to get this to play nice with `stat_summary()` in `ggplot()`. HOWEVER, there is a simple work around. Since `stat_summary()` is simply summarizing our means and error values from the dataset and `summarySEwithin` is doing the exact same thing, we can simply pull these values straight from `summarySEwithin` with one MAJOR caveat. `summarySEwithin` reports the normed means and errors, however we need the original means. Note that this is not an issue when you are only dealing with within subjects factors, but if you are performing mixed ANOVA (combination within-subjects and between-subjects) these means can differ.
+
+To address this problem user `Hause Lin` created a custom function `summarySEwithin2` that reports both normed and unnormed means. You can find this script on their Github site [here](https://gist.github.com/hauselin/a83b6d2f05b0c90c0428017455f73744). I would recommend copying and pasting the code you your own ".R" file for future use. In the meantime we can directly source this code from their site:
+
+```{r}
+source("https://gist.githubusercontent.com/hauselin/a83b6d2f05b0c90c0428017455f73744/raw/38e03ea4bf658d913cf11f4f1c18a1c328265a71/summarySEwithin2.R")
+```
+
+A similar script may be found on [this ggplot tutorial site](http://www.cookbook-r.com/Graphs/Plotting_means_and_error_bars_(ggplot2)/), which forms the basis of this alternative plotting method.
+
+### Plotting the with corrected bars
+
+Given the discussion above, we can plot with the corrected error bars. Let's first create a `plot_table` that contains the means and corrected values.
+
+```{r}
+plot_table <- summarySEwithin2(data=example_data,
+                                  measurevar = "Score",
+                                  withinvars = "Lecture",
+                                  idvar = "Subject")
+plot_table
+```
+
+From here we can refer directly to `descriptiveStats` in constructing the `ggplot`. When plotting you use the `Corrected` values .
+
+```{r}
+p <- ggplot(plot_table, # using the corrected table to make the plots
+            aes(x = Lecture,
+                y = Score, 
+                group=1))
+```
+
+And now to construct the plot. rather than using `summary_stat()` we directly call each `geom`. For example, adding the means and as points:
+
+```{r}
+p <- p + geom_point(size = 2)
+p
+```
+
+Connecting those points with lines:
+
+```{r}
+p <- p + geom_line()
+p
+```
+
+Adding error bars (SE):
+
+```{r}
+p <- p + geom_errorbar(aes(ymin=Score-se, ymax=Score+se), width=0)
+show(p)
+```
+
+note that above I set width of the error bars to 0 to keep consistent with how we've been plotting pointranges. However, if you want caps, you can change the width. I recommend a width no higher than 0.2.
+
+This is what it would look like all in one fell swoop.
+
+```{r}
+plot_table <- summarySEwithin2(data=example_data,
+                                  measurevar = "Score",
+                                  withinvars = "Lecture",
+                                  idvar = "Subject")
+plot_table
+```
+
+```{r}
+ggplot(plot_table, # using the corrected table to make the plots
+            aes(x = Lecture,
+                y = Score, 
+                group=1)) + 
+  geom_point(size = 2) + 
+  geom_errorbar(aes(ymin=Score-se, ymax=Score+se), width=0) + 
+  geom_line() + 
+  theme_cowplot()
+```
+
+## Comparing the outcomes
+
+For reference, here are the corrected error bars (dark blue) next the uncorrected values (orange). As you can see in this case the correction reduced the size of the error bars. This facilitates better interpretation for anyone looking to gleam mean differences from the plots.
+
+```{r}
+ggplot(plot_table, # using the corrected table to make the plots
+            aes(x = Lecture,
+                y = Score, 
+                group=1)) + 
+  geom_point(size = 2, color = "darkblue") + 
+  geom_errorbar(aes(ymin=Score-se, ymax=Score+se), width=0, color = "darkblue") + 
+  stat_summary(data = example_data, 
+               mapping = aes(x = Lecture, y = Score), 
+               fun.data = "mean_se", 
+               position = ggpp::position_dodgenudge(x = .1),
+               color = "darkorange"
+               ) +
+  theme_cowplot()
+```

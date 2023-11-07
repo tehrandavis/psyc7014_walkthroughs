@@ -134,9 +134,9 @@ ggplot(higherEx1,mapping = aes(x = Lecture,y = Score, group=interaction(Presenta
 From here we run the omnibus as usual:
 
 ```{r}
-omnibus_aov <- lm(Score~Lecture*Presentation*Grade, data = higherEx1)
+omnibus_aov <- aov(Score~Lecture*Presentation*Grade, data = higherEx1)
 
-omnibus_aov %>% sjstats::anova_stats()
+omnibus_aov %>% rstatix::anova_test(effect.size="pes")
 ```
 
 In this case we only have Main effects for Lecture and Presentation, and a Lecture × Presentation interaction. Given this we can disregard Grade as its not contributing to any effects.
@@ -145,7 +145,7 @@ In this case we only have Main effects for Lecture and Presentation, and a Lectu
 
 In some cases it is advisable to re-plot the data factoring out Grade by removing Grade from baseline `group=` as well as any `summary_stat::aes()`, (essentially treating this if it was a 2 factorial design like last week). For the sake of your sanity, and your readers' sanity) I would also suggest being consistent with how you present your conditions. For example, in the original plot, Presentation was differentiated by `shape`. To be consistent, we need to do the same here).
 
-(You'll note in the example below I'm also customing font size and weight ourely for personal aesthetics):
+(You'll note in the example below I'm also customizing font size and weight purely for personal aesthetics):
 
 ```{r}
 ggplot(higherEx1,mapping = aes(x = Lecture,y = Score, group=Presentation)) +
@@ -199,9 +199,9 @@ Looking at this plot its quite apparent that the pattern of results is different
 ### running the omnibus ANOVA:
 
 ```{r}
-omnibus_aov <- lm(Score~Lecture*Presentation*Grade, data = higherEx2)
+omnibus_aov <- aov(Score~Lecture*Presentation*Grade, data = higherEx2)
 
-omnibus_aov %>% sjstats::anova_stats()
+omnibus_aov %>% rstatix::anova_test(effect.size="pes")
 ```
 
 Our ANOVA reveals an abundance of results. There are main effects for each of our IVs. In addition there are **two** interaction effects: `Lecture:Presentation` and `Lecture:Grade`. Unless there is a strong theoretical reason not to (which I see none) we will need to examine each of these interactions in further detail.
@@ -351,9 +351,9 @@ ggplot(higherEx3,mapping = aes(x = Lecture,y = Score, group=interaction(Presenta
 ### running the ANOVA:
 
 ```{r}
-omnibus_aov <- lm(Score~Lecture*Presentation*Grade, data = higherEx1)
+omnibus_aov <- aov(Score~Lecture*Presentation*Grade, data = higherEx3)
 
-omnibus_aov %>% sjstats::anova_stats()
+omnibus_aov %>% rstatix::anova_test(effect.size="pes")
 ```
 
 **O.M.F.G., everything is significant!!! What to do!!!**
@@ -380,7 +380,7 @@ Because there were no effects for `5th` graders in the previous analysis, we can
 emmeans(omnibus_aov, by=c("Grade", "Presentation"), specs = "Lecture")  %>% pairs(adjust="tukey")
 ```
 
-Again, this output give us a lot of info, **BUT all we should focus on is the section of interect, in this case `8th Grade, Standard Presentation`** or the last section. Here, scores for the `Social` test were less than the `Physical` and `History.`
+Again, this output give us a lot of info, **BUT all we should focus on is the section of interest, in this case `8th Grade, Standard Presentation`** or the last section. Here, scores for the `Social` test were less than the `Physical` and `History.`
 
 ### Constructing a narrative:
 
@@ -389,13 +389,9 @@ Given these results, what narrative do you think you can tell? Remember use the 
 To remind ourselves:
 
 -   Main effects for Lecture, Presentation, and Grade
-
 -   Two way interactions
-
 -   Three-way interaction that we focus on
-
 -   The results of the 3-way interaction, by Grade:
-
     -   5th graders = no effects
     -   8th graders = Lecture × Presentation interaction, where there was a null effect for Lecture on the Computer presentation, but an effect for Lecture on the Standard Presentation.
 
