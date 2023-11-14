@@ -12,7 +12,7 @@ pacman::p_load(tidyverse,
                cowplot,
                emmeans)
 
-source("http://tehrandav.is/courses/statistics/custom_functions/withinSummary.R")
+source("https://gist.githubusercontent.com/hauselin/a83b6d2f05b0c90c0428017455f73744/raw/38e03ea4bf658d913cf11f4f1c18a1c328265a71/summarySEwithin2.R")
 
 factorial_df <- read_csv("http://tehrandav.is/courses/statistics/practice_datasets/withinEx3.csv")
 
@@ -84,10 +84,10 @@ ggplot(plot_table, aes(x = Day, y = Recalled, group=ProcessDepth)) +
   xlab("Lecture") + 
   ylab ("Score") +
   theme(plot.margin=unit(c(.25,.25,.25,.25),"in")) + 
-  
   # stack legend boxes horizontally:
   theme(legend.box = "horizontal")
 ```
+
 ### rain cloud plot
 
 Here's how we might construct a rain cloud plot for this. For what's its worth, this took a lot of trial and error to get the positioning right. I'd only do this for plots you intend to share with the world. Also note, I'm including the `viridis` package here (including `scale_fill_viridis`). This is a package that provides a color palette that is colorblind friendly. See [here](https://cran.r-project.org/web/packages/viridis/vignettes/intro-to-viridis.html) for more information.
@@ -163,9 +163,40 @@ joint_tests(omnibus_aov, by = "ProcessDepth", model="multivariate")
 
 #### a note on Univariate v. Multivariate methods
 
-You might be asking yourself "why `multivariate` in the model argument above?" Briefly, univariate v. multivariate statistical methods refer to the number of dependent variables associated with the model per fundamental unit of analysis. In psychology research the fundamental unit of analysis is typically the participant---measures are taken at the level of the participant. A univariate model has one dependent variable whereas a multivariate method has two or more per participant. Perhaps some of you are more familiar with this distinction in the context on One-way MANOVA... which analyzes two or more dependent variables simultaneously in an ANOVA design. MANOVA (multivariate ANOVA) is sometimes preferred to running separate univariate ANOVAs if one believes that the dependent variables involved are somehow correlated with one another. In this case MANOVA factors these correlations into the model testing the IVs.
+You might be asking yourself "why `multivariate` in the model argument above?" Briefly, univariate v. multivariate statistical methods refer to the number of dependent variables associated with the model per fundamental unit of analysis. In psychology research the fundamental unit of analysis is typically the participant---measures are taken at the level of the participant. A univariate model has one dependent variable whereas a multivariate method has two or more per participant. Perhaps some of you are more familiar with this distinction in the context on One-way MANOVA... which analyzes two or more dependent variables simultaneously in an ANOVA design. MANOVA (multivariate ANOVA) is sometimes preferred to running separate univariate ANOVAs if one believes that the dependent variables involved are somehow correlated with one another. This is partly because MANOVA doesn't rely on the assumption of Sphericity but does consider the covariance among the measures. In this case MANOVA factors these correlations into the model testing the IVs.
 
-I bring all of this up as one way to conceptualize repeated-measures ANOVA is as multivariate method. Multiple measures are taken at the level of the participant. Specifying `multivariate` tells `R` to consider this case and therefore treat subsequent simple effects ANOVA accordingly.
+I bring all of this up as one way to conceptualize repeated-measures ANOVA is as multivariate method. Multiple measures are taken at the level of the participant. Specifying `multivariate` tells `R` to consider this case and therefore derive the error term and degrees of freedom from a Multivariate Analysis of Variance (MANOVA). In MANOVA, your degrees of freedom are reduced and it tends to be a less powerful statistical method overall, leading to a higher likelihood of Type II errors. Applying MANOVA to a dataset, one typically obtains the Pillai's Trace statistic, ranging from 0 to 1, indicating which term contributes more significantly to the overall model. Additionally, MANOVA provides an estimated F-value.
+
+Contrasting approaches to running our data as an RM-ANOVA vs. a MANOVA. FWIW, you **don't need to explicitly call the MANOVA in your omnibus test**. I'm only showing the MANOVA as a demonstration. In short, you can simply proceed as usual and specify "multivariate" in any follow-ups.
+
+```{r}
+omnibus_aov <- afex::aov_ez(id = "Subject", 
+                            dv = "Recalled", 
+                            data = factorial_df,
+                            within = c("ProcessDepth","Day")
+                            )
+
+omnibus_aov
+                            
+
+# alternative using aov_car
+
+# omnibus_aov <- afex::aov_car(Recalled ~ ProcessDepth * Day + Error(Subject/(ProcessDepth*Day)),
+#                              data = factorial_df)
+```
+
+```{r}
+omnibus_maov <- afex::aov_ez(id = "Subject", 
+                            dv = "Recalled", 
+                            data = factorial_df,
+                            within = c("ProcessDepth","Day"),
+                            return = "Anova"
+                            )
+
+omnibus_maov
+```
+
+We see that the p-values for our tests have increased (though still significant) indicating the loss in power. 
 
 ### post-hoc tests
 
@@ -195,7 +226,7 @@ See the next walkthrough for how to do this in SPSS.
 
 What if we said, "screw it" and we wanted to throw Cohen's caution to the wind and use the error terms from the omnibus ANOVA. After all, this gives us more **power, pow-ah, pow-ahhhh!**
 
-We'll given how we've specificied the model, we would need to do two things. First, we would need to re-build our model, specifying that we desire the output to include an `aov` object (an annoying but necessary step here):
+Well given how we've specificied the model, we would need to do two things. First, we would need to re-build our model, specifying that we desire the output to include an `aov` object (an annoying but necessary step here):
 
 ```{r}
 omnibus_aov <- afex::aov_ez(id = "Subject", 
@@ -229,4 +260,6 @@ post_hoc_tests <- emmeans(omnibus_aov,
 
 post_hoc_tests %>% pairs(adjust="tukey")
 ```
-That said, I would not recommend using this method.
+
+That said, I would not recommend using this method. More on this in the next walkthrough. 
+

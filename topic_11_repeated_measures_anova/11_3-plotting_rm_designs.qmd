@@ -10,13 +10,15 @@ We'll walk through how do deal with this issue in this walkthrough.
 First, let's grab the packages and data from the last walkthrough:
 
 ```{r}
-pacman::p_load(tidyverse,
+pacman::p_load(data.table,
+               tidyverse,
                rstatix,
                cowplot,
                performance,
                emmeans,
                afex,
-               see)
+               see
+               )
 
 example_data <- read_csv("http://tehrandav.is/courses/statistics/practice_datasets/withinEx2.csv")
 
@@ -27,19 +29,14 @@ example_data
 
 ## Violin plots FTW
 
-If you are presenting a simple repeated measures design (e.g., very very factors × levels) then my general recommendation to combine the (uncorrected) mean and standard error bars with a violin plot or a rain cloud plot.
+If you are presenting a simple repeated measures design (e.g., very very factors × levels) then my general recommendation is to combine the (uncorrected) mean and 95% CI error bars with a violin plot or a rain cloud plot.
 
-### Means with half violins
-
-For now, let's just plot the means and standard error bars and add some nice half-violin plots (FWIW the good old fashion violins from earlier walkthroughs work well here as well). You'll need to call in the `ggdist` package for half violin plots.
+For now, let's just plot the means and standard error bars and add some nice violin plots:
 
 ```{r}
-pacman::p_load(ggdist)
-
-
 ggplot(data = example_data, aes(x=Lecture, y=Score)) +
-  geom_violin(trim = F, fill = "lightgrey") + 
-  stat_summary(fun.data = "mean_se", size = .5) + 
+  geom_violin(trim = F, fill = "lightgrey", alpha = 0.6) + 
+  stat_summary(fun.data = "mean_cl_normal", size = .5) + 
   theme_cowplot()
 ```
 
@@ -77,7 +74,7 @@ ggplot(data = example_data, aes(x = Lecture, y=Score, fill = Lecture, color = Le
   guides(fill = "none")
 ```
 
-You might even elect to have your conditions overlap (super level up):
+You might even elect to have your conditions overlap (super level up, though in this case I might not recommend it since the x-axis represents time).
 
 ```{r}
 pacman::p_load(ggrain, ggpp, sdamr)
@@ -101,7 +98,7 @@ ggplot(data = example_data, aes(x = 1, y=Score, fill = Lecture, color = Lecture)
 
 ## Correcting the error bars
 
-That said, a slightly move involved method would be to to "correct" the standard error bars using a methods described by [Cousineau (2005)](https://doaj.org/article/dd17c4ccc4684c9da60c02f3864d09e6) and [Morey (2008)](https://doaj.org/article/011cd52c58b449c4bf169676ca704062).
+That said, a slightly more involved method would be to to "correct" the standard error bars using a methods described by [Cousineau (2005)](https://doaj.org/article/dd17c4ccc4684c9da60c02f3864d09e6) and [Morey (2008)](https://doaj.org/article/011cd52c58b449c4bf169676ca704062).
 
 ### What's going on here?!?!?
 
@@ -120,7 +117,7 @@ normedData
 
 We then calculate the se, sd, and ci values of our normed data, in this case `ScoreNormed` in table above.
 
-The final step is to make a correction on these `Normed` values ([Morey (2008)](https://doaj.org/article/011cd52c58b449c4bf169676ca704062)). This is done by taking the number of levels of the within factor (`nWithinGroups`) and applying the following correction:
+The final step is to make a correction on these `Normed` values ([Morey (2008)](https://doaj.org/article/011cd52c58b449c4bf169676ca704062). This is done by taking the number of levels of the within factor (`nWithinGroups`) and applying the following correction:
 
 ```{r}
 # get the number of levels in Lecture:
@@ -148,7 +145,9 @@ Rmisc::summarySEwithin(data=example_data,
                        idvar = "Subject")
 ```
 
-Unfortunately, to date I haven't found a way to get this to play nice with `stat_summary()` in `ggplot()`. HOWEVER, there is a simple work around. Since `stat_summary()` is simply summarizing our means and error values from the dataset and `summarySEwithin` is doing the exact same thing, we can simply pull these values straight from `summarySEwithin` with one MAJOR caveat. `summarySEwithin` reports the normed means and errors, however we need the original means. Note that this is not an issue when you are only dealing with within subjects factors, but if you are performing mixed ANOVA (combination within-subjects and between-subjects) these means can differ.
+Unfortunately, to date I haven't found a way to get this to play nice with `stat_summary()` in `ggplot()`. HOWEVER, there is a simple work around. Since `stat_summary()` is simply summarizing our means and error values from the dataset and `summarySEwithin` is doing the exact same thing, we can simply pull these values straight from `summarySEwithin`.
+
+However, before we go off using `summarySEwithin` there is still one more issue—`summarySEwithin` reports the **normed** means and errors. For plotting, however, we need the **original** means. Note that this is not an issue when you are only dealing with within subjects factors like this week, but if you are performing mixed ANOVA (combination within-subjects and between-subjects) these means can differ from one another.
 
 To address this problem user `Hause Lin` created a custom function `summarySEwithin2` that reports both normed and unnormed means. You can find this script on their Github site [here](https://gist.github.com/hauselin/a83b6d2f05b0c90c0428017455f73744). I would recommend copying and pasting the code you your own ".R" file for future use. In the meantime we can directly source this code from their site:
 
@@ -158,9 +157,10 @@ source("https://gist.githubusercontent.com/hauselin/a83b6d2f05b0c90c0428017455f7
 
 A similar script may be found on [this ggplot tutorial site](http://www.cookbook-r.com/Graphs/Plotting_means_and_error_bars_(ggplot2)/), which forms the basis of this alternative plotting method.
 
+
 ### Plotting the with corrected bars
 
-Given the discussion above, we can plot with the corrected error bars. Let's first create a `plot_table` that contains the means and corrected values.
+Given the discussion above, we can plot with the corrected error bars. Let's first create a `plot_table` that contains the means and corrected values using `summaryWEwithin2`
 
 ```{r}
 plot_table <- summarySEwithin2(data=example_data,
@@ -170,16 +170,18 @@ plot_table <- summarySEwithin2(data=example_data,
 plot_table
 ```
 
-From here we can refer directly to `descriptiveStats` in constructing the `ggplot`. When plotting you use the `Corrected` values .
+From here we can construct our `ggplot` using the summary table that we created, `plot_table`. 
 
 ```{r}
 p <- ggplot(plot_table, # using the corrected table to make the plots
-            aes(x = Lecture,
-                y = Score, 
-                group=1))
+            aes(x = Lecture, # plot_table Lecture on the x-axis,
+                y = Score, # plot_table Score on the y-axis 
+                group=1 # necessary for constructing line plots
+                )
+            )
 ```
 
-And now to construct the plot. rather than using `summary_stat()` we directly call each `geom`. For example, adding the means and as points:
+For this method, rather than using `summary_stat()` we directly call each `geom`. For example, adding the means and as points:
 
 ```{r}
 p <- p + geom_point(size = 2)

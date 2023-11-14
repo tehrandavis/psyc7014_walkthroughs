@@ -86,13 +86,18 @@ book:
         - topic_10_factorial_anova/10_3-interactions.qmd 
         - topic_10_factorial_anova/10_4-advanced_example_and_apa.qmd 
         - topic_10_factorial_anova/10_5-higher_order_anova.qmd
+        
     - part: "Part 11: REPEATED MEASURES ANOVA"
       chapters:
         - topic_11_repeated_measures_anova/11_1-afex_ANOVA.qmd 
         - topic_11_repeated_measures_anova/11_2-repeated_measures_anova.qmd
-        - topic_11_repeated_measures_anova/11_3_plotting_rm_designs.qmd
+        - topic_11_repeated_measures_anova/11_3-plotting_rm_designs.qmd
         - topic_11_repeated_measures_anova/11_4-factorial_rma.qmd
         - topic_11_repeated_measures_anova/11_5-sphericity.qmd
+        
+    - part: "Part 12: MIXED EFFECTS ANOVA"
+      chapters:
+        - topic_12_mixed_anova/12_1-mixed_effects_anova.qmd
                 
 
   

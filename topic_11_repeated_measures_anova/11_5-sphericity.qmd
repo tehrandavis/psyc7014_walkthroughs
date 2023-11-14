@@ -240,3 +240,4 @@ BC <- varB + varC - 2*covBC
 
 list("A to B" = AB, "A to C" = AC,"B to C" = BC)
 ```
+

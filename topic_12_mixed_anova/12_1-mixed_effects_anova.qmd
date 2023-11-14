@@ -2,7 +2,7 @@
 title: "Mixed-effects ANOVA (BS + WS)"
 ---
 
-For our final trick with ANOVA, we will be covering mixed effects designs. Mixed models sometimes go by many names (mixed effects model, multi-level model, growth-curve models) depending on the structure of the data that is being analyzed. For this week we will be focusing on Mixed effects ANOVA.
+For our final trick with ANOVA, we will be covering mixed effects designs. Mixed models sometimes go by many names (mixed effects model, multi-level model, growth-curve models) depending on the structure of the data that is being analyzed. For this week we will be focusing on Mixed effects factorial ANOVA.
 
 This walk-though assumes the following packages:
 
@@ -10,9 +10,8 @@ This walk-though assumes the following packages:
 pacman::p_load(tidyverse, #tidy goodness
                cowplot, # easy clean plots
                afex, # ANOVA
-               Rmisc, # summary tables
                emmeans, # contrasts
-               heplots) # homogeneity of covariance
+               MVTests) # multivariate tests, needed for homogeneity of covariance
 ```
 
 ## TL;DR
@@ -63,7 +62,7 @@ example_wide <- example_long %>% tidyr::pivot_wider(names_from = "Interval",
 
 # box's M
 # boxM(withinSubjects columns, betweenSubjects column)
-heplots::boxM(example_wide[,3:8], example_wide$Group)
+MVTests::BoxM(example_wide[,3:8], example_wide$Group)
 ```
 
 4.  Run the Anova
@@ -74,9 +73,7 @@ example_anova <- afex::aov_ez(id = "SubjectID",
                               data = example_long,
                               between = "Group",
                               within = "Interval",
-                              type = 3,
-                              return = "afex_aov",
-                              anova_table = list(es="pes",correction="GG"))
+                              type = 3)
 
 example_anova
 ```
@@ -115,7 +112,7 @@ The data above is in wide format. I need to get it into long format before submi
 ```{r}
 # create subject column
 # seq_along on Group ensures that every between participant gets a unique ID
-example1 <-  example1 %>% mutate("SubjectID" = seq_along(example1$Group)) 
+example1 <-  example1 %>% mutate(SubjectID = seq_along(Group)) 
 
 # data is in wide format, needs to be long format for R,
 # notice that I only need to collapse the "Interval" columns (2 through 7):
@@ -176,9 +173,9 @@ In his 1953 paper, *Non-Normality And Tests On Variances* George Box makes the d
 
 > To make the preliminary test on variances is rather like putting to sea in a rowing boat to find out whether conditions are sufficiently calm for an ocean liner to leave port!
 
-This reinforces our in class discussions about the robustness of ANOVA. Nonetheless, we should still test to get an impression of how far we are deviating from our assumptions. Here, we are testing for homogeneity of covariance matrices. To do so we will use Box's (1949) [M test](https://en.wikiversity.org/wiki/Box%27s_M) (be sure to check the class website for a link to the original article). In short, the test compares the product of the log determinants of the separate covariance matrices to the log determinant of the pooled covariance matrix, analogous to a likelihood ratio test. See [here](https://www.mathsisfun.com/algebra/matrix-determinant.html) for how determinants are calculated. The test statistic uses a chi-square approximation. This test can be found in the `heplots` package.
+This reinforces our in class discussions about the robustness of ANOVA. Nonetheless, we should still test to get an impression of how far we are deviating from our assumptions. Here, we are testing for homogeneity of covariance matrices. To do so we will use Box's (1949) [M test](https://en.wikiversity.org/wiki/Box%27s_M) (be sure to check the class website for a link to the original article). In short, the test compares the product of the log determinants of the separate covariance matrices to the log determinant of the pooled covariance matrix, analogous to a likelihood ratio test. See [here](https://www.mathsisfun.com/algebra/matrix-determinant.html) for how determinants are calculated. The test statistic uses a chi-square approximation. This test can be found in the `MVTests` package.
 
-##### Running the `boxM`: getting the data in WIDE format?!?!?
+##### Running the `BoxM`: getting the data in WIDE format?!?!?
 
 Well, this is awkward. In order to test this assumption the data needs structured with the within variable in wide format... which is exactly the way that it was when we originally downloaded it. In order to go from long format to wide format we can use the `pivot_wider()` function (or in this case we could just use our original data frame).
 
@@ -191,29 +188,29 @@ example1_wide
 
 **Important** note that we only `pivot_wider()` our within-subjects data. We DO NOT `pivot_wider()` the between subjects data. In this case, we leave `Group` alone!
 
-`example1_wide` gets us back to where we started (sorry for running you in circles), but I wanted to show you how this is done in case you get your data in long format. Now that the data is in wide format, we can check for the homogeneity of covariance matrices using `boxM`.
+`example1_wide` gets us back to where we started (sorry for running you in circles), but I wanted to show you how this is done in case you get your data in long format. Now that the data is in wide format, we can check for the homogeneity of covariance matrices using `BoxM`.
 
 ##### Using the `boxM` test.
 
-The call for the `boxM` takes two arguments
+The call for the `BoxM` takes two arguments
 
 -   the within-subject columns
 -   the between subject column
 
 ```{r}
-ws_columns <- example1_wide %>% select(contains("Int"))
+ws_columns <- example1_wide %>% dplyr::select(contains("Int"))
 bs_column <- example1_wide$Group
 
-heplots::boxM(ws_columns,bs_column)
+MVTests::BoxM(ws_columns,bs_column)
 ```
 
-Note that we typically only concern ourselves with `boxM` if $p$ \< .001. Why so conservative you ask? Because `boxM` is typically underpowered for small samples and overly sensitive with larger sample sizes (Cohen, 2008). Then why use it, you may ask... ahh it's just step 1 my young Padawan.
+Note that we typically only concern ourselves with `boxM` if $p$ \< .001. Why so conservative you ask? Because `BoxM` is typically underpowered for small samples and overly sensitive with larger sample sizes (Cohen, 2008). Then why use it, you may ask... ahh it's just step 1 my young Padawan.
 
 In either case these data look good.
 
 #### Test 2: Our friend Levene (and its cousin Brown-Forsythe)
 
-Let's assume that we failed `boxM`, what the next step? We can run Levene's Test for homogeneity of variance, or Brown-Forsythe if we have concerns about the normality of the data. Recall that both can be called from `car::leveneTest()` where Levene's is `mean centered` and Brown-Forsythe is `median centered`. In this case we run separate tests on the between subjects `Group` and the BS × WS interaction, in this case `Group * Interval`.
+Let's assume that we failed `BoxM`, what the next step? We can run Levene's Test for homogeneity of variance, or Brown-Forsythe if we have concerns about the normality of the data. Recall that both can be called from `car::leveneTest()` where Levene's is `mean centered` and Brown-Forsythe is `median centered`. In this case we run separate tests on the between subjects `Group` and the BS × WS interaction, in this case `Group * Interval`.
 
 **Note that do do this we return to our data in long format.**
 
@@ -221,17 +218,17 @@ Here I'll run Brown-Forsythe
 
 ```{r}
 # Brown-Forsythe for Group only
-leveneTest(Activity~Group,data = example1_long, center="median")
+car::leveneTest(Activity~Group,data = example1_long, center="median")
 
 # Brown-Forsythe for Group * Interval interaction.
-leveneTest(Activity~Group*Interval,data = example1_long, center="median")
+car::leveneTest(Activity~Group*Interval,data = example1_long, center="median")
 ```
 
-In this case we are particularly concerned with the outcome of the `Group*Interval` interaction. If this interaction had been significant ($p$ \< .05), coupled with a significant `boxM` ($p$ \< .001) then we would have cause for concern.
+In this case we are particularly concerned with the outcome of the `Group*Interval` interaction. If this interaction had been significant ($p$ \< .05), coupled with a significant `**oxM**` ($p$ \< .001) then we would have cause for concern.
 
 I'll say it one more time with feeling---you should be concerned about your data if:
 
--   the `boxM` test is significant ($p$ \< .001) AND
+-   the `BoxM` test is significant ($p$ \< .001) AND
 -   the Levene's test of a model that crosses the BS variable \* WS variable is significant ($p$ \< .05)
 
 #### What to do if you violate both tests?
@@ -255,10 +252,8 @@ control_data <- example1_long %>% filter(Group=="Control")
 afex::aov_ez(id = "SubjectID",
              dv = "Activity",
              data = control_data,
-             within = "Interval",
-             type = 3,
-             return = "afex_aov",
-             anova_table = list(es="pes",correction="none"))
+             within = "Interval"
+             )
 ```
 
 That said, you can also use `split()` like so:
@@ -276,10 +271,7 @@ Then we run each group separately, here's `Control` again:
 afex::aov_ez(id = "SubjectID",
              dv = "Activity",
              data = byGroup$Control,
-             within = "Interval",
-             type = 3,
-             return = "afex_aov",
-             anova_table = list(es="pes",correction="none"))
+             within = "Interval")
 ```
 
 We could run BS-ANOVA on each interval using similar methods.
@@ -290,10 +282,10 @@ Now we can plot (not worrying about APA here). Given that interval is a within s
 
 ```{r}
 # grabbing custom function
-source("http://tehrandav.is/courses/statistics/custom_functions/withinSummary.R")
+source("https://gist.githubusercontent.com/hauselin/a83b6d2f05b0c90c0428017455f73744/raw/38e03ea4bf658d913cf11f4f1c18a1c328265a71/summarySEwithin2.R")
 
 # creating a summary table
-repdata <- withinSummary(data = example1_long,
+repdata <- summarySEwithin2(data = example1_long,
                          measurevar = "Activity",
                          betweenvars = "Group",
                          withinvars = "Interval",
@@ -304,7 +296,7 @@ show(repdata)
 
 This contains the means (`Activity`), normed means (`ActivityNormed`), and estimates of distribution for each `Group` × `Interval` Condition. The normed means are calculated by removing the between-subject variability. This is accomplished be ensuring that each participant have the same average (see this link for background and calculations [link](http://www.cogsci.nl/blog/tutorials/156-an-easy-way-to-create-graphs-with-within-subject-error-bars), Values of se, ci, and sd are then calculated on this normed data. For or resulting plot, we use the raw data for our means and the corrected sd, se, or ci for our error bars.
 
-Using ggplot, this can be accomplished by using the data from our summary table `repdata$Corrected` and using direct calls instead of `summary_stat`:
+Using ggplot, this can be accomplished by using the data from our summary table `repdata` and using direct calls instead of `summary_stat`:
 
 ```{r}
 # create universal position dodge
@@ -313,9 +305,9 @@ dodge_all <- position_dodge(.3)
 
 # now plot:
 
-ggplot(data = repdata$Corrected,mapping = aes(x=Interval,
-                                              y=Activity,
-                                              group=Group)
+ggplot(data = repdata,mapping = aes(x=Interval,
+                                    y=Activity,
+                                    group=Group)
        ) +
   geom_pointrange(aes(shape=Group, 
                       ymin=Activity-se, 
@@ -327,7 +319,7 @@ ggplot(data = repdata$Corrected,mapping = aes(x=Interval,
 
 Now THESE are the error bars we're looking for!
 
-Remember however, when reporting the error values, you need to use the actual values and NOT the corrected ones from this plot. For this you would refer to the data in the `repdata$Actual` function.
+Remember however, when reporting the error values, you need to use the actual values and NOT the corrected ones from this plot. For this you would refer to the values you get from `rstatix::get_summary_stats`.
 
 ### Running our ANOVA:
 
@@ -338,17 +330,19 @@ ex1.aov <- afex::aov_ez(id = "SubjectID",
                         dv = "Activity",
                         data = example1_long,
                         between = "Group",
-                        within = "Interval",
-                        type = 3,
-                        return = "afex_aov",
-                        anova_table = list(es="pes",correction="GG"))
-
-ex1.aov
-
-summary(ex1.aov)
+                        within = "Interval")
 ```
 
-Note that sphericity has been violated. **Indeed, mixed ANOVA designs are more likely to give rise to sphericity violations!!** I therefore need to make the appropriate corrections for my ANOVA. In this case a simple re-run of the `aov_ez` setting `correction="GG"` should suffice.
+And now to check for spherecity:
+```{r}
+performance::check_sphericity(ex1.aov)
+```
+
+Note that sphericity has been violated. **Indeed, mixed ANOVA designs are more likely to give rise to sphericity violations!!** I therefore need to make the appropriate corrections for my ANOVA. In this case I would call `anova` setting `correction="GG"`.
+
+```{r}
+anova(ex1.aov, es = "pes", correction = "GG")
+```
 
 ### simple effects
 
@@ -422,7 +416,7 @@ example2_long$Freq <- as.numeric(example2_long$Freq)
 First we need to create the data for the appropriate error bars
 
 ```{r}
-repdata <- withinSummary(data = example2_long,
+repdata <- summarySEwithin2(data = example2_long,
                          measurevar = "Freq",
                          betweenvars = c("Condition","Sex"), 
                          withinvars = "Time",
@@ -439,7 +433,7 @@ dodge_all <- position_dodge(.3)
 
 # now plot:
 
-p <- ggplot(data = repdata$Corrected,mapping = aes(x=Time,
+p <- ggplot(data = repdata,mapping = aes(x=Time,
                                                    y=Freq,
                                                    group=interaction(Condition,Sex))) + 
   geom_pointrange(aes(shape=Condition, ymin=Freq-se, ymax=Freq+se), size=.5, position = dodge_all) +
@@ -465,7 +459,7 @@ show(p)
 The order along the x-axis is the reverse of what I'd like. Since I'm plotting using `repdata` I need to change the order of my levels there. I can change this by:
 
 ```{r}
-repdata$Corrected$Time <- repdata$Corrected$Time %>% fct_relevel(c("Pretest","Posttest","FU6","FU12"))
+repdata$Time <- repdata$Time %>% fct_relevel(c("Pretest","Posttest","FU6","FU12"))
 ```
 
 and now re-plot (adjusting the position of my legend accordingly):
@@ -476,7 +470,7 @@ dodge_all <- position_dodge(.3)
 
 # now plot:
 
-ggplot(data = repdata$Corrected,mapping = aes(x=Time,y=Freq,group=interaction(Condition,Sex))) + 
+ggplot(data = repdata,mapping = aes(x=Time,y=Freq,group=interaction(Condition,Sex))) + 
   geom_pointrange(aes(shape=Condition, ymin=Freq-se, ymax=Freq+se), size=.5, position = dodge_all) +
   geom_line(aes(linetype=Sex), size=1, position = dodge_all) + 
   theme_cowplot() +
@@ -499,7 +493,7 @@ On to our assumptions tests!!
 
 ### testing our assumptions
 
-#### `boxM`
+#### `BoxM`
 
 I could just use the original `example2` object, but let's spread for practice:
 
@@ -511,8 +505,8 @@ example2_wide <- example2_long %>% pivot_wider(names_from = "Time", values_from 
 and now `boxM`. Since we have two between variables, we'll need to run a separate test for each:
 
 ```{r}
-heplots::boxM(example2_wide[,4:7],example2_wide$Condition)
-heplots::boxM(example2_wide[,4:7],example2_wide$Sex)
+MVTests::BoxM(example2_wide[,4:7],example2_wide$Condition)
+MVTests::BoxM(example2_wide[,4:7],example2_wide$Sex)
 ```
 
 In both cases we are fine ($p$ \> .001). Moving on to the ANOVA.
@@ -520,12 +514,21 @@ In both cases we are fine ($p$ \> .001). Moving on to the ANOVA.
 ### Run your omnibus ANOVA:
 
 ```{r}
-ex2.aov <- afex::aov_ez(id = "Person",dv = "Freq",data = example2_long,between = c("Sex", "Condition"), within = "Time",type = 3,return = "afex_aov",anova_table = list(es="pes",correction="GG"))
+ex2.aov <- afex::aov_ez(id = "Person",
+                        dv = "Freq",
+                        data = example2_long,
+                        between = c("Sex", "Condition"),
+                         within = "Time"
+)
 
-summary(ex2.aov)
+performance::check_sphericity(ex2.aov)
 ```
 
 Our Mauchly Tests for Sphericity pass, so no need to adjust our degrees of freedom.
+
+```{r}
+anova(ex2.aov, es = "pes")
+```
 
 And here we see a main effect for `Sex` and a `Condition:Time` interaction. Now to follow-up...
 
@@ -534,16 +537,16 @@ And here we see a main effect for `Sex` and a `Condition:Time` interaction. Now 
 Similar to our first example there are two ways in which we can address that Interaction. We can look for simple (within) effects for Time on each of the between factors (Condition) that we are interested in, or we can look at simple between effects for Condition on each Time level of interest. To help guide this decision, let's replot the data focusing on this interaction (removing `Sex`)
 
 ```{r}
-simpleData <- withinSummary(data = example2_long,
+simpleData <- summarySEwithin2(data = example2_long,
                             measurevar = "Freq",
                             betweenvars = "Condition",
                             withinvars = "Time",
                             id = "Person")
 
 # releveling and factoring
-simpleData$Corrected$Time <- factor(simpleData$Corrected$Time,levels = c("Pretest","Posttest","FU6","FU12"))
+simpleData$Time <- factor(simpleData$Time,levels = c("Pretest","Posttest","FU6","FU12"))
 
-ggplot(data = simpleData$Corrected,mapping = aes(x=Time,y=Freq,group=Condition)) + 
+ggplot(data = simpleData,mapping = aes(x=Time,y=Freq,group=Condition)) + 
   geom_pointrange(aes(shape=Condition, ymin=Freq-se, ymax=Freq+se), size=.5, position = dodge_all) +
   geom_line(position = dodge_all) + 
   theme_cowplot() +
@@ -584,7 +587,7 @@ Here we only pay attention to instances where `Condition = EC`. We see that we h
 emmeans(ex2.aov, by = c("Sex","Condition"), pairwise~Time, adjust="tukey", model = "multivariate")
 ```
 
-A ton of output here, but we are only concerned with `Sex = M, Condition = EC`.
+A ton of output here, **but we are only concerned with `Sex = M, Condition = EC`**. 
 
 #### by Time (between nested in within):
 
